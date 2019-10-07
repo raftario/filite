@@ -19,9 +19,10 @@ pub mod setup {
     use diesel::sqlite::SqliteConnection;
 
     /// Creates a SQLite database connection pool
-    pub fn create_pool(url: &str) -> Pool {
+    pub fn create_pool(url: &str, size: u32) -> Pool {
         let manager = ConnectionManager::<SqliteConnection>::new(url);
         r2d2::Pool::builder()
+            .max_size(size)
             .build(manager)
             .expect("Can't create pool.")
     }
