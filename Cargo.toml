@@ -1,0 +1,18 @@
+[package]
+name = "filite"
+version = "0.1.0"
+authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+actix-web = "1.0.8"
+chrono = "0.4.9"
+[dependencies.diesel]
+version = "1.4.2"
+features = ["r2d2", "sqlite"]
+[dependencies.libsqlite3-sys]
+version = "0.12.0"
+features = ["bundled"]
+
+[dev-dependencies]
+dotenv = "0.14.1"

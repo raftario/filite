@@ -1,0 +1,10 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# User specific files
+.env
+**/*.db
+
+# JetBrains settings
+.idea/
