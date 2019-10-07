@@ -5,6 +5,7 @@ target/
 # User specific files
 .env
 **/*.db
+**/*.log
 
 # JetBrains settings
 .idea/

@@ -7,9 +7,13 @@ pub mod files {
     /// An entry from the `files` table
     #[derive(Queryable, Identifiable)]
     pub struct File {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// Path to the file to serve relative to the static files root
         pub filepath: String,
+        /// Creation date and time as a UNIX timestamp
         pub created: i32,
+        /// Update date and time as a UNIX timestamp
         pub updated: i32,
     }
 
@@ -17,7 +21,9 @@ pub mod files {
     #[derive(Insertable)]
     #[table_name = "files"]
     pub struct NewFile<'a> {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// Path to the file to serve relative to the static files root
         pub filepath: &'a str,
     }
 }
@@ -29,9 +35,13 @@ pub mod links {
     /// An entry from the `links` table
     #[derive(Queryable, Identifiable)]
     pub struct Link {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// URL this link forwards to
         pub forward: String,
+        /// Creation date and time as a UNIX timestamp
         pub created: i32,
+        /// Update date and time as a UNIX timestamp
         pub updated: i32,
     }
 
@@ -39,7 +49,9 @@ pub mod links {
     #[derive(Insertable)]
     #[table_name = "links"]
     pub struct NewLink<'a> {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// URL this link forwards to
         pub forward: &'a str,
     }
 }
@@ -51,9 +63,12 @@ pub mod texts {
     /// An entry from the `texts` table
     #[derive(Queryable, Identifiable)]
     pub struct Text {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
         pub contents: String,
+        /// Creation date and time as a UNIX timestamp
         pub created: i32,
+        /// Update date and time as a UNIX timestamp
         pub updated: i32,
     }
 
@@ -61,7 +76,9 @@ pub mod texts {
     #[derive(Insertable)]
     #[table_name = "texts"]
     pub struct NewText<'a> {
+        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// Text to serve
         pub contents: &'a str,
     }
 }
