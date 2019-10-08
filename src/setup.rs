@@ -1,4 +1,4 @@
-//! Functions used for the initial setup
+//! Utilities used during the initial setup
 
 use crate::Pool;
 
@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use dotenv;
 #[cfg(debug_assertions)]
 use std::env;
+#[cfg(debug_assertions)]
+use std::str::FromStr;
 
 /// Returns a path to the directory storing application data
 pub fn get_data_dir() -> PathBuf {
@@ -56,9 +58,20 @@ impl Default for Config {
         };
         let pool_size = num_cpus::get() as u32 / 2;
         let files_dir = {
-            let mut path = get_data_dir();
-            path.push("data");
-            path
+            cfg_if! {
+                if #[cfg(debug_assertions)] {
+                    let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
+                    let mut path = PathBuf::from_str(cargo_manifest_dir)
+                        .expect("Can't convert cargo manifest dir to path");
+                    let files_dir = env::var("FILES_DIR").expect("Can't parse FILES_DIR environment variable.");
+                    path.push(&files_dir);
+                    path
+                } else {
+                    let mut path = get_data_dir();
+                    path.push("data");
+                    path
+                }
+            }
         };
 
         Config {
