@@ -4,13 +4,12 @@ use crate::Pool;
 
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 
 #[cfg(debug_assertions)]
 use dotenv;
-#[cfg(debug_assertions)]
-use std::env;
 #[cfg(debug_assertions)]
 use std::str::FromStr;
 
@@ -131,4 +130,14 @@ pub fn create_pool(url: &str, size: u32) -> Pool {
         .max_size(size)
         .build(manager)
         .expect("Can't create pool.")
+}
+
+/// Initializes the logger
+pub fn init_logger() {
+    if cfg!(debug_assertions) && env::var_os("RUST_LOG").is_none() {
+        env::set_var("RUST_LOG", "actix_web=debug");
+    } else if !cfg!(debug_assertions) {
+        env::set_var("RUST_LOG", "actix_web=info");
+    }
+    env_logger::init();
 }
