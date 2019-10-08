@@ -3,86 +3,153 @@
 // A lot of duplicate code here could be merged by using macros
 // but that would make adding different fields more troublesome
 
+/// Date and time range specifying ranges for creation and update
+pub struct SelectRange {
+    /// Creation time range
+    pub created: (Option<i32>, Option<i32>),
+    /// Update time range
+    pub updated: (Option<i32>, Option<i32>),
+}
+
+/// Query string for SELECT queries
+#[derive(Deserialize)]
+pub struct SelectQuery {
+    /// Left creation bounder timestamp
+    pub cf: Option<i32>,
+    /// Right creation bounder timestamp
+    pub ct: Option<i32>,
+    /// Left update bounder timestamp
+    pub uf: Option<i32>,
+    /// Right update bounder timestamp
+    pub ut: Option<i32>,
+    /// Query size limit
+    pub limit: Option<i64>,
+    /// Whether to sort the results in ascending order
+    pub asc: Option<bool>,
+    /// Whether to sort the results by creation date
+    pub created: Option<bool>,
+}
+
+/// Filters for SELECT queries
+pub struct SelectFilters {
+    /// Creation and update date and time ranges
+    pub range: SelectRange,
+    /// Query size limit
+    pub limit: Option<i64>,
+    /// Whether to sort the results in ascending order
+    pub order_asc: bool,
+    /// Whether to sort the results by creation date
+    pub order_created: bool,
+}
+
+impl From<SelectQuery> for SelectFilters {
+    fn from(query: SelectQuery) -> Self {
+        SelectFilters {
+            range: SelectRange {
+                created: (query.cf, query.ct),
+                updated: (query.uf, query.ut),
+            },
+            limit: query.limit,
+            order_asc: query.asc.unwrap_or(false),
+            order_created: query.created.unwrap_or(false),
+        }
+    }
+}
+
+/// Code common to all select functions
+macro_rules! common_select {
+    ($q:expr, $f:expr) => {
+        if let Some(cf) = $f.range.created.0 {
+            $q = $q.filter(created.ge(cf));
+        }
+        if let Some(ct) = $f.range.created.1 {
+            $q = $q.filter(created.lt(ct));
+        }
+        if let Some(uf) = $f.range.updated.0 {
+            $q = $q.filter(updated.ge(uf));
+        }
+        if let Some(ut) = $f.range.updated.1 {
+            $q = $q.filter(updated.lt(ut));
+        }
+
+        if let Some(limit) = $f.limit {
+            $q = $q.limit(limit);
+        }
+
+        $q = match ($f.order_asc, $f.order_created) {
+            (false, false) => $q.order(updated.desc()),
+            (true, false) => $q.order(updated.asc()),
+            (false, true) => $q.order(created.desc()),
+            (true, true) => $q.order(created.asc()),
+        };
+    };
+}
+
+/// SELECT a single entry given its id
+macro_rules! find {
+    ($n:ident, $t:ty) => {
+        pub fn find(f_id: i32, pool: Data<Pool>) -> QueryResult<$t> {
+            let conn: &SqliteConnection = &pool.get().unwrap();
+            $n.find(f_id).first::<$t>(conn)
+        }
+    };
+}
+
+/// DELETE an entry
+macro_rules! delete {
+    ($n:ident) => {
+        pub fn delete(d_id: i32, pool: Data<Pool>) -> QueryResult<()> {
+            let conn: &SqliteConnection = &pool.get().unwrap();
+            diesel::delete($n.find(d_id)).execute(conn)?;
+
+            Ok(())
+        }
+    };
+}
+
 /// Queries affecting the `files` table
 pub mod files {
     use crate::models::files::*;
+    use crate::queries::SelectFilters;
     use crate::schema::files::dsl::*;
     use crate::schema::files::table;
-    use crate::{Pool, SelectRange};
+    use crate::Pool;
 
     use actix_web::web::Data;
     use diesel::prelude::*;
     use diesel::result::QueryResult;
 
     /// SELECT multiple file entries
-    pub fn select(
-        range: SelectRange,
-        limit: Option<i64>,
-        order_asc: bool,
-        order_created: bool,
-        pool: Data<Pool>,
-    ) -> QueryResult<Vec<File>> {
+    pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<File>> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let mut query = files.into_boxed();
-
-        if let Some(cf) = range.created.0 {
-            query = query.filter(created.ge(cf));
-        }
-        if let Some(ct) = range.created.1 {
-            query = query.filter(created.lt(ct));
-        }
-        if let Some(uf) = range.updated.0 {
-            query = query.filter(updated.ge(uf));
-        }
-        if let Some(ut) = range.updated.1 {
-            query = query.filter(updated.lt(ut));
-        }
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
-        query = match (order_asc, order_created) {
-            (false, false) => query.order(updated.desc()),
-            (true, false) => query.order(updated.asc()),
-            (false, true) => query.order(created.desc()),
-            (true, true) => query.order(created.asc()),
-        };
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
+        common_select!(query, filters);
         query.load::<File>(conn)
     }
 
-    /// SELECT a single file entry given its id
-    pub fn find(g_id: i32, pool: Data<Pool>) -> QueryResult<File> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        files.find(g_id).first::<File>(conn)
-    }
+    find!(files, File);
 
     /// INSERT a file entry
-    pub fn insert(p_id: i32, p_filepath: &str, pool: Data<Pool>) -> QueryResult<File> {
+    pub fn insert(i_id: i32, p_filepath: &str, pool: Data<Pool>) -> QueryResult<File> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_file = NewFile {
-            id: p_id,
+            id: i_id,
             filepath: p_filepath,
         };
         diesel::insert_into(table).values(&new_file).execute(conn)?;
 
-        find(p_id, pool)
+        find(i_id, pool)
     }
 
     /// UPDATE a file entry
     pub fn update(
-        p_id: i32,
+        u_id: i32,
         new_id: Option<i32>,
         new_filepath: Option<&str>,
         pool: Data<Pool>,
     ) -> QueryResult<File> {
         let conn: &SqliteConnection = &pool.get().unwrap();
-        let file = find(p_id, pool)?;
+        let file = find(u_id, pool)?;
         let query = diesel::update(&file);
         let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
         match (new_id, new_filepath) {
@@ -107,95 +174,52 @@ pub mod files {
         Ok(file)
     }
 
-    /// DELETE a file entry
-    pub fn delete(d_id: i32, pool: Data<Pool>) -> QueryResult<()> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        diesel::delete(files.find(d_id)).execute(conn)?;
-
-        Ok(())
-    }
+    delete!(files);
 }
 
 /// Queries affecting the `links` table
 pub mod links {
     use crate::models::links::*;
+    use crate::queries::SelectFilters;
     use crate::schema::links::dsl::*;
     use crate::schema::links::table;
-    use crate::{Pool, SelectRange};
+    use crate::Pool;
 
     use actix_web::web::Data;
     use diesel::prelude::*;
     use diesel::result::QueryResult;
 
     /// SELECT multiple link entries
-    pub fn select(
-        range: SelectRange,
-        limit: Option<i64>,
-        order_asc: bool,
-        order_created: bool,
-        pool: Data<Pool>,
-    ) -> QueryResult<Vec<Link>> {
+    pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<Link>> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let mut query = links.into_boxed();
-
-        if let Some(cf) = range.created.0 {
-            query = query.filter(created.ge(cf));
-        }
-        if let Some(ct) = range.created.1 {
-            query = query.filter(created.lt(ct));
-        }
-        if let Some(uf) = range.updated.0 {
-            query = query.filter(updated.ge(uf));
-        }
-        if let Some(ut) = range.updated.1 {
-            query = query.filter(updated.lt(ut));
-        }
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
-        query = match (order_asc, order_created) {
-            (false, false) => query.order(updated.desc()),
-            (true, false) => query.order(updated.asc()),
-            (false, true) => query.order(created.desc()),
-            (true, true) => query.order(created.asc()),
-        };
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
+        common_select!(query, filters);
         query.load::<Link>(conn)
     }
 
-    /// SELECT a single link entry given its id
-    pub fn find(g_id: i32, pool: Data<Pool>) -> QueryResult<Link> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        links.find(g_id).first::<Link>(conn)
-    }
+    find!(links, Link);
 
     /// INSERT a link entry
-    pub fn insert(p_id: i32, p_forward: &str, pool: Data<Pool>) -> QueryResult<Link> {
+    pub fn insert(i_id: i32, p_forward: &str, pool: Data<Pool>) -> QueryResult<Link> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_link = NewLink {
-            id: p_id,
+            id: i_id,
             forward: p_forward,
         };
         diesel::insert_into(table).values(&new_link).execute(conn)?;
 
-        find(p_id, pool)
+        find(i_id, pool)
     }
 
     /// UPDATE a link entry
     pub fn update(
-        p_id: i32,
+        u_id: i32,
         new_id: Option<i32>,
         new_forward: Option<&str>,
         pool: Data<Pool>,
     ) -> QueryResult<Link> {
         let conn: &SqliteConnection = &pool.get().unwrap();
-        let link = find(p_id, pool)?;
+        let link = find(u_id, pool)?;
         let query = diesel::update(&link);
         let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
         match (new_id, new_forward) {
@@ -218,91 +242,52 @@ pub mod links {
         Ok(link)
     }
 
-    /// DELETE a link entry
-    pub fn delete(d_id: i32, pool: Data<Pool>) -> QueryResult<()> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        diesel::delete(links.find(d_id)).execute(conn)?;
-
-        Ok(())
-    }
+    delete!(links);
 }
 
 /// Queries affecting the `texts` table
 pub mod texts {
     use crate::models::texts::*;
+    use crate::queries::SelectFilters;
     use crate::schema::texts::dsl::*;
     use crate::schema::texts::table;
-    use crate::{Pool, SelectRange};
+    use crate::Pool;
 
     use actix_web::web::Data;
     use diesel::prelude::*;
     use diesel::result::QueryResult;
 
     /// SELECT multiple text entries
-    pub fn select(
-        range: SelectRange,
-        limit: Option<i64>,
-        order_asc: bool,
-        order_created: bool,
-        pool: Data<Pool>,
-    ) -> QueryResult<Vec<Text>> {
+    pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<Text>> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let mut query = texts.into_boxed();
-
-        if let Some(cf) = range.created.0 {
-            query = query.filter(created.ge(cf));
-        }
-        if let Some(ct) = range.created.1 {
-            query = query.filter(created.lt(ct));
-        }
-        if let Some(uf) = range.updated.0 {
-            query = query.filter(updated.ge(uf));
-        }
-        if let Some(ut) = range.updated.1 {
-            query = query.filter(updated.lt(ut));
-        }
-
-        query = match (order_asc, order_created) {
-            (false, false) => query.order(updated.desc()),
-            (true, false) => query.order(updated.asc()),
-            (false, true) => query.order(created.desc()),
-            (true, true) => query.order(created.asc()),
-        };
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
+        common_select!(query, filters);
         query.load::<Text>(conn)
     }
 
-    /// SELECT a single text entry given its id
-    pub fn find(g_id: i32, pool: Data<Pool>) -> QueryResult<Text> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        texts.find(g_id).first::<Text>(conn)
-    }
+    find!(texts, Text);
 
     /// INSERT a text entry
-    pub fn insert(p_id: i32, p_contents: &str, pool: Data<Pool>) -> QueryResult<Text> {
+    pub fn insert(i_id: i32, p_contents: &str, pool: Data<Pool>) -> QueryResult<Text> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_text = NewText {
-            id: p_id,
+            id: i_id,
             contents: p_contents,
         };
         diesel::insert_into(table).values(&new_text).execute(conn)?;
 
-        find(p_id, pool)
+        find(i_id, pool)
     }
 
     /// UPDATE a text entry
     pub fn update(
-        p_id: i32,
+        u_id: i32,
         new_id: Option<i32>,
         new_contents: Option<&str>,
         pool: Data<Pool>,
     ) -> QueryResult<Text> {
         let conn: &SqliteConnection = &pool.get().unwrap();
-        let text = find(p_id, pool)?;
+        let text = find(u_id, pool)?;
         let query = diesel::update(&text);
         let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
         match (new_id, new_contents) {
@@ -325,11 +310,5 @@ pub mod texts {
         Ok(text)
     }
 
-    /// DELETE a text entry
-    pub fn delete(d_id: i32, pool: Data<Pool>) -> QueryResult<()> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        diesel::delete(texts.find(d_id)).execute(conn)?;
-
-        Ok(())
-    }
+    delete!(texts);
 }

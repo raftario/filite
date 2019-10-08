@@ -1,11 +1,9 @@
 #[macro_use]
 extern crate cfg_if;
-#[macro_use]
-extern crate serde;
 
-use filite::queries;
+use filite::queries::{self, SelectFilters, SelectQuery};
 use filite::setup::{self, Config};
-use filite::{Pool, SelectRange};
+use filite::Pool;
 
 use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer, Responder};
 use futures::Future;
@@ -39,71 +37,25 @@ fn init() -> Config {
     })
 }
 
-/// Query string for SELECT queries
-#[derive(Deserialize)]
-struct SelectQuery {
-    /// Left creation bounder timestamp
-    cf: Option<i32>,
-    /// Right creation bounder timestamp
-    ct: Option<i32>,
-    /// Left update bounder timestamp
-    uf: Option<i32>,
-    /// Right update bounder timestamp
-    ut: Option<i32>,
-    /// Query size limit
-    limit: Option<i64>,
-    /// Whether to sort the results in ascending order
-    asc: Option<bool>,
-    /// Whether to sort the results by creation date
-    created: Option<bool>,
-}
-
-/// Filters for SELECT queries
-struct SelectFilters {
-    /// Creation and update date and time ranges
-    range: SelectRange,
-    /// Query size limit
-    limit: Option<i64>,
-    /// Whether to sort the results in ascending order
-    order_asc: bool,
-    /// Whether to sort the results by creation date
-    order_created: bool,
-}
-
-impl From<SelectQuery> for SelectFilters {
-    fn from(query: SelectQuery) -> Self {
-        SelectFilters {
-            range: SelectRange {
-                created: (query.cf, query.ct),
-                updated: (query.uf, query.ut),
-            },
-            limit: query.limit,
-            order_asc: query.asc.unwrap_or(false),
-            order_created: query.created.unwrap_or(false),
+/// GET multiple entries
+macro_rules! select {
+    ($n:ident, $m:ident) => {
+        fn $n(
+            query: web::Query<SelectQuery>,
+            pool: web::Data<Pool>,
+        ) -> impl Future<Item = HttpResponse, Error = Error> {
+            let filters = SelectFilters::from(query.into_inner());
+            web::block(move || queries::$m::select(filters, pool)).then(|result| match result {
+                Ok(x) => Ok(HttpResponse::Ok().json(x)),
+                Err(_) => Ok(HttpResponse::InternalServerError().into()),
+            })
         }
-    }
+    };
 }
 
-/// GET multiple file entries
-fn get_files(
-    query: web::Query<SelectQuery>,
-    pool: web::Data<Pool>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    let filters = SelectFilters::from(query.into_inner());
-    web::block(move || {
-        queries::files::select(
-            filters.range,
-            filters.limit,
-            filters.order_asc,
-            filters.order_created,
-            pool,
-        )
-    })
-    .then(|result| match result {
-        Ok(files) => Ok(HttpResponse::Ok().json(files)),
-        Err(_) => Ok(HttpResponse::InternalServerError().into()),
-    })
-}
+select!(get_files, files);
+select!(get_links, links);
+select!(get_texts, texts);
 
 fn index() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
@@ -132,6 +84,8 @@ fn main() {
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(index))
             .service(web::resource("/f").route(web::get().to_async(get_files)))
+            .service(web::resource("/l").route(web::get().to_async(get_links)))
+            .service(web::resource("/t").route(web::get().to_async(get_texts)))
     })
     .bind(&format!("localhost:{}", port))
     .unwrap_or_else(|e| {
