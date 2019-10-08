@@ -32,13 +32,13 @@ fn get_config_path() -> PathBuf {
 #[serde(default)]
 pub struct Config {
     /// Port to listen on
-    port: u16,
+    pub port: u16,
     /// SQLite database connection url
-    database_url: String,
+    pub database_url: String,
     /// SQLite database connection pool size
-    pool_size: u32,
+    pub pool_size: u32,
     /// Directory where to store static files
-    files_dir: PathBuf,
+    pub files_dir: PathBuf,
 }
 
 impl Default for Config {
@@ -137,7 +137,7 @@ pub fn init_logger() {
     if cfg!(debug_assertions) && env::var_os("RUST_LOG").is_none() {
         env::set_var("RUST_LOG", "actix_web=debug");
     } else if !cfg!(debug_assertions) {
-        env::set_var("RUST_LOG", "actix_web=info");
+        env::set_var("RUST_LOG", "actix_web=warn");
     }
     env_logger::init();
 }
