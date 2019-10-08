@@ -57,6 +57,10 @@ select!(get_files, files);
 select!(get_links, links);
 select!(get_texts, texts);
 
+fn get_config(config: web::Data<Config>) -> impl Responder {
+    HttpResponse::Ok().json(config.get_ref())
+}
+
 fn index() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
@@ -83,6 +87,7 @@ fn main() {
             .data(pool.clone())
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(index))
+            .service(web::resource("/config").route(web::get().to(get_config)))
             .service(web::resource("/f").route(web::get().to_async(get_files)))
             .service(web::resource("/l").route(web::get().to_async(get_links)))
             .service(web::resource("/t").route(web::get().to_async(get_texts)))
