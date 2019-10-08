@@ -52,13 +52,16 @@ fn main() {
 
     let pool = setup::create_pool(&config.database_url, config.pool_size);
 
+    let port = config.port;
+
     HttpServer::new(move || {
         App::new()
+            .data(config.clone())
             .data(pool.clone())
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(index))
     })
-    .bind(&format!("localhost:{}", config.port))
+    .bind(&format!("localhost:{}", port))
     .unwrap_or_else(|e| {
         eprintln!("Can't bind webserver to specified port: {}.", e);
         process::exit(1);

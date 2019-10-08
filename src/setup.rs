@@ -28,7 +28,7 @@ fn get_config_path() -> PathBuf {
 }
 
 /// Application configuration
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
     /// Port to listen on
