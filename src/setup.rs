@@ -32,6 +32,8 @@ fn get_config_path() -> PathBuf {
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Port to listen on
+    port: u16,
     /// SQLite database connection url
     database_url: String,
     /// SQLite database connection pool size
@@ -42,39 +44,23 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let port = 8080;
         let database_url = {
-            cfg_if! {
-                if #[cfg(debug_assertions)] {
-                    dotenv::dotenv().ok();
-                    env::var("DATABASE_URL").expect("Can't parse DATABASE_URL environment variable.")
-                } else {
-                    let mut path = get_data_dir();
-                    path.push("database.db");
-                    path.to_str()
-                        .expect("Can't convert database path to string.")
-                        .to_owned()
-                }
-            }
+            let mut path = get_data_dir();
+            path.push("database.db");
+            path.to_str()
+                .expect("Can't convert database path to string.")
+                .to_owned()
         };
         let pool_size = num_cpus::get() as u32 / 2;
         let files_dir = {
-            cfg_if! {
-                if #[cfg(debug_assertions)] {
-                    let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
-                    let mut path = PathBuf::from_str(cargo_manifest_dir)
-                        .expect("Can't convert cargo manifest dir to path");
-                    let files_dir = env::var("FILES_DIR").expect("Can't parse FILES_DIR environment variable.");
-                    path.push(&files_dir);
-                    path
-                } else {
-                    let mut path = get_data_dir();
-                    path.push("data");
-                    path
-                }
-            }
+            let mut path = get_data_dir();
+            path.push("data");
+            path
         };
 
         Config {
+            port,
             database_url,
             pool_size,
             files_dir,
@@ -105,6 +91,35 @@ impl Config {
         match fs::write(&path, &contents) {
             Ok(_) => Ok(()),
             Err(_) => Err("Can't write config file."),
+        }
+    }
+
+    /// Creates a config from environment variables
+    #[cfg(debug_assertions)]
+    pub fn debug() -> Self {
+        dotenv::dotenv().ok();
+
+        let get_env = |k: &str| -> String {
+            env::var(k).expect(&format!("Can't parse {} environment variable.", k))
+        };
+
+        let port = get_env("PORT").parse().expect("Invalid PORT.");
+        let database_url = get_env("DATABASE_URL");
+        let pool_size = get_env("POOL_SIZE").parse().expect("Invalid POOL_SIZE.");
+        let files_dir = {
+            let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
+            let mut path = PathBuf::from_str(cargo_manifest_dir)
+                .expect("Can't convert cargo manifest dir to path.");
+            let files_dir = get_env("FILES_DIR");
+            path.push(&files_dir);
+            path
+        };
+
+        Config {
+            port,
+            database_url,
+            pool_size,
+            files_dir,
         }
     }
 }
