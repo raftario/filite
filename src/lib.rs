@@ -3,7 +3,6 @@ extern crate diesel;
 #[macro_use]
 extern crate serde;
 
-use chrono::{DateTime, Utc};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 
@@ -16,10 +15,12 @@ pub mod setup;
 pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
 /// Date and time range
-type DateTimeRange = (Option<DateTime<Utc>>, Option<DateTime<Utc>>);
+type DateTimeRange = (Option<i32>, Option<i32>);
 
 /// Date and time range specifying ranges for creation and update
 pub struct SelectRange {
-    created: DateTimeRange,
-    updated: DateTimeRange,
+    /// Creation time range
+    pub created: DateTimeRange,
+    /// Update time range
+    pub updated: DateTimeRange,
 }

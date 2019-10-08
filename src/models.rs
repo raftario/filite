@@ -5,7 +5,7 @@ pub mod files {
     use crate::schema::files;
 
     /// An entry from the `files` table
-    #[derive(Queryable, Identifiable)]
+    #[derive(Queryable, Identifiable, Serialize)]
     pub struct File {
         /// Primary key, its radix 36 value is used as an url
         pub id: i32,
@@ -33,7 +33,7 @@ pub mod links {
     use crate::schema::links;
 
     /// An entry from the `links` table
-    #[derive(Queryable, Identifiable)]
+    #[derive(Queryable, Identifiable, Serialize)]
     pub struct Link {
         /// Primary key, its radix 36 value is used as an url
         pub id: i32,
@@ -61,7 +61,7 @@ pub mod texts {
     use crate::schema::texts;
 
     /// An entry from the `texts` table
-    #[derive(Queryable, Identifiable)]
+    #[derive(Queryable, Identifiable, Serialize)]
     pub struct Text {
         /// Primary key, its radix 36 value is used as an url
         pub id: i32,

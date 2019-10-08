@@ -26,20 +26,16 @@ pub mod files {
         let mut query = files.into_boxed();
 
         if let Some(cf) = range.created.0 {
-            let timestamp = cf.timestamp() as i32;
-            query = query.filter(created.ge(timestamp));
+            query = query.filter(created.ge(cf));
         }
         if let Some(ct) = range.created.1 {
-            let timestamp = ct.timestamp() as i32;
-            query = query.filter(created.lt(timestamp));
+            query = query.filter(created.lt(ct));
         }
         if let Some(uf) = range.updated.0 {
-            let timestamp = uf.timestamp() as i32;
-            query = query.filter(updated.ge(timestamp));
+            query = query.filter(updated.ge(uf));
         }
         if let Some(ut) = range.updated.1 {
-            let timestamp = ut.timestamp() as i32;
-            query = query.filter(updated.lt(timestamp));
+            query = query.filter(updated.lt(ut));
         }
 
         if let Some(limit) = limit {
@@ -52,6 +48,10 @@ pub mod files {
             (false, true) => query.order(created.desc()),
             (true, true) => query.order(created.asc()),
         };
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
 
         query.load::<File>(conn)
     }
@@ -139,20 +139,16 @@ pub mod links {
         let mut query = links.into_boxed();
 
         if let Some(cf) = range.created.0 {
-            let timestamp = cf.timestamp() as i32;
-            query = query.filter(created.ge(timestamp));
+            query = query.filter(created.ge(cf));
         }
         if let Some(ct) = range.created.1 {
-            let timestamp = ct.timestamp() as i32;
-            query = query.filter(created.lt(timestamp));
+            query = query.filter(created.lt(ct));
         }
         if let Some(uf) = range.updated.0 {
-            let timestamp = uf.timestamp() as i32;
-            query = query.filter(updated.ge(timestamp));
+            query = query.filter(updated.ge(uf));
         }
         if let Some(ut) = range.updated.1 {
-            let timestamp = ut.timestamp() as i32;
-            query = query.filter(updated.lt(timestamp));
+            query = query.filter(updated.lt(ut));
         }
 
         if let Some(limit) = limit {
@@ -165,6 +161,10 @@ pub mod links {
             (false, true) => query.order(created.desc()),
             (true, true) => query.order(created.asc()),
         };
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
 
         query.load::<Link>(conn)
     }
@@ -250,24 +250,16 @@ pub mod texts {
         let mut query = texts.into_boxed();
 
         if let Some(cf) = range.created.0 {
-            let timestamp = cf.timestamp() as i32;
-            query = query.filter(created.ge(timestamp));
+            query = query.filter(created.ge(cf));
         }
         if let Some(ct) = range.created.1 {
-            let timestamp = ct.timestamp() as i32;
-            query = query.filter(created.lt(timestamp));
+            query = query.filter(created.lt(ct));
         }
         if let Some(uf) = range.updated.0 {
-            let timestamp = uf.timestamp() as i32;
-            query = query.filter(updated.ge(timestamp));
+            query = query.filter(updated.ge(uf));
         }
         if let Some(ut) = range.updated.1 {
-            let timestamp = ut.timestamp() as i32;
-            query = query.filter(updated.lt(timestamp));
-        }
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
+            query = query.filter(updated.lt(ut));
         }
 
         query = match (order_asc, order_created) {
@@ -276,6 +268,10 @@ pub mod texts {
             (false, true) => query.order(created.desc()),
             (true, true) => query.order(created.asc()),
         };
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
 
         query.load::<Text>(conn)
     }
