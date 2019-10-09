@@ -5,6 +5,7 @@ authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
 
 [dependencies]
+actix-files = "0.1.5"
 actix-web = "1.0.8"
 cfg-if = "0.1.10"
 chrono = "0.4.9"

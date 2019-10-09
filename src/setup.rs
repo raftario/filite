@@ -54,7 +54,7 @@ impl Default for Config {
         let pool_size = num_cpus::get() as u32 / 2;
         let files_dir = {
             let mut path = get_data_dir();
-            path.push("data");
+            path.push("files");
             path
         };
 
@@ -106,12 +106,19 @@ impl Config {
         let database_url = get_env("DATABASE_URL");
         let pool_size = get_env("POOL_SIZE").parse().expect("Invalid POOL_SIZE.");
         let files_dir = {
-            let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
-            let mut path = PathBuf::from_str(cargo_manifest_dir)
-                .expect("Can't convert cargo manifest dir to path.");
             let files_dir = get_env("FILES_DIR");
-            path.push(&files_dir);
-            path
+            let path = PathBuf::from_str(&files_dir).expect("Can't convert files dir to path");
+            if path.is_absolute() {
+                path.canonicalize().expect("Invalid FILES_DIR")
+            } else {
+                let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
+                let mut cargo_manifest_dir = PathBuf::from_str(cargo_manifest_dir)
+                    .expect("Can't convert cargo manifest dir to path.");
+                cargo_manifest_dir.push(&path);
+                cargo_manifest_dir
+                    .canonicalize()
+                    .expect("Invalid FILES_DIR")
+            }
         };
 
         Config {
@@ -137,7 +144,7 @@ pub fn init_logger() {
     if cfg!(debug_assertions) && env::var_os("RUST_LOG").is_none() {
         env::set_var("RUST_LOG", "actix_web=debug");
     } else if !cfg!(debug_assertions) {
-        env::set_var("RUST_LOG", "actix_web=warn");
+        env::set_var("RUST_LOG", "actix_web=info");
     }
     env_logger::init();
 }
