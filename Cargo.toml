@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 actix-files = "0.1.5"
 actix-web = "1.0.8"
+base64 = "0.10.1"
 cfg-if = "0.1.10"
 chrono = "0.4.9"
 dirs = "2.0.2"

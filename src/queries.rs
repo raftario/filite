@@ -129,16 +129,18 @@ pub mod files {
 
     find!(files, File);
 
-    /// INSERT a file entry
-    pub fn insert(i_id: i32, p_filepath: &str, pool: Data<Pool>) -> QueryResult<File> {
+    /// REPLACE a file entry
+    pub fn replace(r_id: i32, r_filepath: &str, pool: Data<Pool>) -> QueryResult<File> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_file = NewFile {
-            id: i_id,
-            filepath: p_filepath,
+            id: r_id,
+            filepath: r_filepath,
         };
-        diesel::insert_into(table).values(&new_file).execute(conn)?;
+        diesel::replace_into(table)
+            .values(&new_file)
+            .execute(conn)?;
 
-        find(i_id, pool)
+        find(r_id, pool)
     }
 
     /// UPDATE a file entry
@@ -199,16 +201,18 @@ pub mod links {
 
     find!(links, Link);
 
-    /// INSERT a link entry
-    pub fn insert(i_id: i32, p_forward: &str, pool: Data<Pool>) -> QueryResult<Link> {
+    /// REPLACE a link entry
+    pub fn replace(r_id: i32, r_forward: &str, pool: Data<Pool>) -> QueryResult<Link> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_link = NewLink {
-            id: i_id,
-            forward: p_forward,
+            id: r_id,
+            forward: r_forward,
         };
-        diesel::insert_into(table).values(&new_link).execute(conn)?;
+        diesel::replace_into(table)
+            .values(&new_link)
+            .execute(conn)?;
 
-        find(i_id, pool)
+        find(r_id, pool)
     }
 
     /// UPDATE a link entry
@@ -267,16 +271,18 @@ pub mod texts {
 
     find!(texts, Text);
 
-    /// INSERT a text entry
-    pub fn insert(i_id: i32, p_contents: &str, pool: Data<Pool>) -> QueryResult<Text> {
+    /// REPLACE a text entry
+    pub fn replace(r_id: i32, r_contents: &str, pool: Data<Pool>) -> QueryResult<Text> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_text = NewText {
-            id: i_id,
-            contents: p_contents,
+            id: r_id,
+            contents: r_contents,
         };
-        diesel::insert_into(table).values(&new_text).execute(conn)?;
+        diesel::replace_into(table)
+            .values(&new_text)
+            .execute(conn)?;
 
-        find(i_id, pool)
+        find(r_id, pool)
     }
 
     /// UPDATE a text entry
