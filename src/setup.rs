@@ -2,6 +2,7 @@
 
 use crate::Pool;
 
+use actix_web::middleware::Logger;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use std::env;
@@ -147,4 +148,20 @@ pub fn init_logger() {
         env::set_var("RUST_LOG", "actix_web=info");
     }
     env_logger::init();
+}
+
+/// Returs the logger middleware
+pub fn logger_middleware() -> Logger {
+    cfg_if! {
+        if #[cfg(debug_assertions)] {
+            dotenv::dotenv().ok();
+            if let Ok(format) = env::var("LOG_FORMAT") {
+                Logger::new(&format)
+            } else {
+                Logger::default()
+            }
+        } else {
+            Logger::default()
+        }
+    }
 }

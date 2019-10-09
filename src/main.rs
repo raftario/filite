@@ -6,7 +6,7 @@ use filite::setup::{self, Config};
 use filite::Pool;
 
 use actix_files::NamedFile;
-use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, Error, HttpResponse, HttpServer, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::Future;
 use std::process;
@@ -157,7 +157,7 @@ fn main() {
         App::new()
             .data(config.clone())
             .data(pool.clone())
-            .wrap(middleware::Logger::default())
+            .wrap(setup::logger_middleware())
             .route("/", web::get().to(index))
             .service(web::resource("/config").route(web::get().to(get_config)))
             .service(web::resource("/f").route(web::get().to_async(get_files)))
