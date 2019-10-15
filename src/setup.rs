@@ -10,10 +10,10 @@ use std::path::PathBuf;
 
 #[cfg(debug_assertions)]
 use dotenv;
-#[cfg(debug_assertions)]
-use std::str::FromStr;
 #[cfg(not(debug_assertions))]
 use std::fs;
+#[cfg(debug_assertions)]
+use std::str::FromStr;
 
 /// Returns a path to the directory storing application data
 pub fn get_data_dir() -> PathBuf {

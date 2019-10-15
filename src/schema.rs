@@ -3,7 +3,6 @@ table! {
         id -> Integer,
         filepath -> Text,
         created -> Integer,
-        updated -> Integer,
     }
 }
 
@@ -12,7 +11,6 @@ table! {
         id -> Integer,
         forward -> Text,
         created -> Integer,
-        updated -> Integer,
     }
 }
 
@@ -21,7 +19,6 @@ table! {
         id -> Integer,
         contents -> Text,
         created -> Integer,
-        updated -> Integer,
     }
 }
 

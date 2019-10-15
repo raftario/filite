@@ -70,8 +70,8 @@ pub mod files {
     use chrono::{Datelike, Utc};
     use futures::future::{self, Either};
     use futures::Future;
-    use std::path::PathBuf;
     use std::fs;
+    use std::path::PathBuf;
 
     select!(files);
 
@@ -189,7 +189,7 @@ pub mod links {
             web::block(move || queries::links::find(id, pool)).then(|result| match result {
                 Ok(link) => Ok(HttpResponse::Found()
                     .header("Location", link.forward)
-                    .header("Last-Modified", timestamp_to_last_modified(link.updated))
+                    .header("Last-Modified", timestamp_to_last_modified(link.created))
                     .finish()),
                 Err(_) => Err(HttpResponse::NotFound().finish().into()),
             }),
@@ -237,7 +237,7 @@ pub mod texts {
         Either::A(
             web::block(move || queries::texts::find(id, pool)).then(|result| match result {
                 Ok(text) => Ok(HttpResponse::Ok()
-                    .header("Last-Modified", timestamp_to_last_modified(text.updated))
+                    .header("Last-Modified", timestamp_to_last_modified(text.created))
                     .body(text.contents)),
                 Err(_) => Err(HttpResponse::NotFound().finish().into()),
             }),

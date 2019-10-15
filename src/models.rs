@@ -13,8 +13,6 @@ pub mod files {
         pub filepath: String,
         /// Creation date and time as a UNIX timestamp
         pub created: i32,
-        /// Update date and time as a UNIX timestamp
-        pub updated: i32,
     }
 
     /// A new entry to the `files` table
@@ -41,8 +39,6 @@ pub mod links {
         pub forward: String,
         /// Creation date and time as a UNIX timestamp
         pub created: i32,
-        /// Update date and time as a UNIX timestamp
-        pub updated: i32,
     }
 
     /// A new entry to the `links` table
@@ -65,11 +61,10 @@ pub mod texts {
     pub struct Text {
         /// Primary key, its radix 36 value is used as an url
         pub id: i32,
+        /// Text contents
         pub contents: String,
         /// Creation date and time as a UNIX timestamp
         pub created: i32,
-        /// Update date and time as a UNIX timestamp
-        pub updated: i32,
     }
 
     /// A new entry to the `texts` table

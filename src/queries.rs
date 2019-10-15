@@ -1,57 +1,34 @@
 //! Helper functions for SQL queries
 
-// A lot of duplicate code here could be merged by using macros
-// but that would make adding different fields more troublesome
-
-/// Date and time range specifying ranges for creation and update
-pub struct SelectRange {
-    /// Creation time range
-    pub created: (Option<i32>, Option<i32>),
-    /// Update time range
-    pub updated: (Option<i32>, Option<i32>),
-}
-
 /// Query string for SELECT queries
 #[derive(Deserialize)]
 pub struct SelectQuery {
     /// Left creation bounder timestamp
-    pub cf: Option<i32>,
+    pub from: Option<i32>,
     /// Right creation bounder timestamp
-    pub ct: Option<i32>,
-    /// Left update bounder timestamp
-    pub uf: Option<i32>,
-    /// Right update bounder timestamp
-    pub ut: Option<i32>,
+    pub to: Option<i32>,
     /// Query size limit
     pub limit: Option<i64>,
     /// Whether to sort the results in ascending order
     pub asc: Option<bool>,
-    /// Whether to sort the results by creation date
-    pub created: Option<bool>,
 }
 
 /// Filters for SELECT queries
 pub struct SelectFilters {
     /// Creation and update date and time ranges
-    pub range: SelectRange,
+    pub range: (Option<i32>, Option<i32>),
     /// Query size limit
     pub limit: Option<i64>,
     /// Whether to sort the results in ascending order
-    pub order_asc: bool,
-    /// Whether to sort the results by creation date
-    pub order_created: bool,
+    pub asc: bool,
 }
 
 impl From<SelectQuery> for SelectFilters {
     fn from(query: SelectQuery) -> Self {
         SelectFilters {
-            range: SelectRange {
-                created: (query.cf, query.ct),
-                updated: (query.uf, query.ut),
-            },
+            range: (query.from, query.to),
             limit: query.limit,
-            order_asc: query.asc.unwrap_or(false),
-            order_created: query.created.unwrap_or(false),
+            asc: query.asc.unwrap_or(false),
         }
     }
 }
@@ -59,29 +36,21 @@ impl From<SelectQuery> for SelectFilters {
 /// Code common to all select functions
 macro_rules! common_select {
     ($q:expr, $f:expr) => {
-        if let Some(cf) = $f.range.created.0 {
-            $q = $q.filter(created.ge(cf));
+        if let Some(from) = $f.range.0 {
+            $q = $q.filter(created.ge(from));
         }
-        if let Some(ct) = $f.range.created.1 {
-            $q = $q.filter(created.lt(ct));
-        }
-        if let Some(uf) = $f.range.updated.0 {
-            $q = $q.filter(updated.ge(uf));
-        }
-        if let Some(ut) = $f.range.updated.1 {
-            $q = $q.filter(updated.lt(ut));
+        if let Some(to) = $f.range.1 {
+            $q = $q.filter(created.lt(to));
         }
 
         if let Some(limit) = $f.limit {
             $q = $q.limit(limit);
         }
 
-        $q = match ($f.order_asc, $f.order_created) {
-            (false, false) => $q.order(updated.desc()),
-            (true, false) => $q.order(updated.asc()),
-            (false, true) => $q.order(created.desc()),
-            (true, true) => $q.order(created.asc()),
-        };
+        match $f.asc {
+            false => $q = $q.order(created.desc()),
+            true => $q = $q.order(created.asc()),
+        }
     };
 }
 
@@ -143,39 +112,6 @@ pub mod files {
         find(r_id, pool)
     }
 
-    /// UPDATE a file entry
-    pub fn update(
-        u_id: i32,
-        new_id: Option<i32>,
-        new_filepath: Option<&str>,
-        pool: Data<Pool>,
-    ) -> QueryResult<File> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        let file = find(u_id, pool)?;
-        let query = diesel::update(&file);
-        let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
-        match (new_id, new_filepath) {
-            (Some(new_id), Some(new_filepath)) => {
-                query
-                    .set((id.eq(new_id), filepath.eq(new_filepath), time_update))
-                    .execute(conn)?;
-            }
-            (Some(new_id), None) => {
-                query.set((id.eq(new_id), time_update)).execute(conn)?;
-            }
-            (None, Some(new_filepath)) => {
-                query
-                    .set((filepath.eq(new_filepath), time_update))
-                    .execute(conn)?;
-            }
-            (None, None) => {
-                return Ok(file);
-            }
-        }
-
-        Ok(file)
-    }
-
     delete!(files);
 }
 
@@ -215,37 +151,6 @@ pub mod links {
         find(r_id, pool)
     }
 
-    /// UPDATE a link entry
-    pub fn update(
-        u_id: i32,
-        new_id: Option<i32>,
-        new_forward: Option<&str>,
-        pool: Data<Pool>,
-    ) -> QueryResult<Link> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        let link = find(u_id, pool)?;
-        let query = diesel::update(&link);
-        let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
-        match (new_id, new_forward) {
-            (Some(new_id), Some(new_forward)) => {
-                query
-                    .set((id.eq(new_id), forward.eq(new_forward), time_update))
-                    .execute(conn)?;
-            }
-            (Some(new_id), None) => {
-                query.set((id.eq(new_id), time_update)).execute(conn)?;
-            }
-            (None, Some(new_forward)) => {
-                query
-                    .set((forward.eq(new_forward), time_update))
-                    .execute(conn)?;
-            }
-            (None, None) => (),
-        }
-
-        Ok(link)
-    }
-
     delete!(links);
 }
 
@@ -283,37 +188,6 @@ pub mod texts {
             .execute(conn)?;
 
         find(r_id, pool)
-    }
-
-    /// UPDATE a text entry
-    pub fn update(
-        u_id: i32,
-        new_id: Option<i32>,
-        new_contents: Option<&str>,
-        pool: Data<Pool>,
-    ) -> QueryResult<Text> {
-        let conn: &SqliteConnection = &pool.get().unwrap();
-        let text = find(u_id, pool)?;
-        let query = diesel::update(&text);
-        let time_update = updated.eq(chrono::Utc::now().timestamp() as i32);
-        match (new_id, new_contents) {
-            (Some(new_id), Some(new_contents)) => {
-                query
-                    .set((id.eq(new_id), contents.eq(new_contents), time_update))
-                    .execute(conn)?;
-            }
-            (Some(new_id), None) => {
-                query.set((id.eq(new_id), time_update)).execute(conn)?;
-            }
-            (None, Some(new_contents)) => {
-                query
-                    .set((contents.eq(new_contents), time_update))
-                    .execute(conn)?;
-            }
-            (None, None) => (),
-        }
-
-        Ok(text)
     }
 
     delete!(texts);
