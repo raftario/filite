@@ -1,14 +1,26 @@
 #[macro_use]
-extern crate cfg_if;
+extern crate diesel;
 #[macro_use]
 extern crate serde;
 
-use filite::setup::{self, Config};
+use crate::setup::Config;
 
 use actix_web::{web, App, FromRequest, HttpServer};
-use std::{process};
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::sqlite::SqliteConnection;
+use std::process;
 
-mod handlers;
+#[cfg(not(debug_assertions))]
+use std::fs;
+
+pub mod handlers;
+pub mod models;
+pub mod queries;
+pub mod schema;
+pub mod setup;
+
+/// SQLite database connection pool
+pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
 /// Performs the initial setup
 #[cfg(not(debug_assertions))]
@@ -37,12 +49,14 @@ fn init() -> Config {
 
 fn main() {
     let config = {
-        cfg_if! {
-            if #[cfg(debug_assertions)] {
-                Config::debug()
-            } else {
-                init()
-            }
+        #[cfg(debug_assertions)]
+        {
+            Config::debug()
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            init()
         }
     };
     setup::init_logger();

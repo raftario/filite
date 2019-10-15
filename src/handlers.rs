@@ -1,4 +1,4 @@
-use filite::setup::Config;
+use crate::setup::Config;
 
 use actix_web::{web, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -60,9 +60,9 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 pub mod files {
     use crate::handlers::id_from_b36;
 
-    use filite::queries::{self, SelectFilters, SelectQuery};
-    use filite::setup::Config;
-    use filite::Pool;
+    use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::setup::Config;
+    use crate::Pool;
 
     use actix_files::NamedFile;
     use actix_web::error::BlockingError;
@@ -170,8 +170,8 @@ pub mod files {
 pub mod links {
     use crate::handlers::{id_from_b36, timestamp_to_last_modified};
 
-    use filite::queries::{self, SelectFilters, SelectQuery};
-    use filite::Pool;
+    use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
     use futures::future::{self, Either};
@@ -219,8 +219,8 @@ pub mod links {
 pub mod texts {
     use crate::handlers::{id_from_b36, timestamp_to_last_modified};
 
-    use filite::queries::{self, SelectFilters, SelectQuery};
-    use filite::Pool;
+    use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
     use futures::future::{self, Either};

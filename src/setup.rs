@@ -6,13 +6,14 @@ use actix_web::middleware::Logger;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use std::env;
-use std::fs;
 use std::path::PathBuf;
 
 #[cfg(debug_assertions)]
 use dotenv;
 #[cfg(debug_assertions)]
 use std::str::FromStr;
+#[cfg(not(debug_assertions))]
+use std::fs;
 
 /// Returns a path to the directory storing application data
 pub fn get_data_dir() -> PathBuf {
@@ -22,6 +23,7 @@ pub fn get_data_dir() -> PathBuf {
 }
 
 /// Returns a path to the configuration file
+#[cfg(not(debug_assertions))]
 fn get_config_path() -> PathBuf {
     let mut path = get_data_dir();
     path.push("config.toml");
@@ -44,7 +46,7 @@ macro_rules! parse_env {
 
 /// Application configuration
 #[derive(Serialize, Deserialize, Clone)]
-#[serde(default)]
+#[cfg_attr(not(debug_assertions), serde(default))]
 pub struct Config {
     /// Port to listen on
     pub port: u16,
@@ -58,6 +60,7 @@ pub struct Config {
     pub max_filesize: usize,
 }
 
+#[cfg(not(debug_assertions))]
 impl Default for Config {
     fn default() -> Self {
         let port = 8080;
@@ -88,6 +91,7 @@ impl Default for Config {
 
 impl Config {
     /// Deserialize the config file
+    #[cfg(not(debug_assertions))]
     pub fn read_file() -> Result<Self, &'static str> {
         let path = get_config_path();
         let contents = if let Ok(contents) = fs::read_to_string(&path) {
@@ -129,6 +133,7 @@ impl Config {
     }
 
     /// Serialize the config file
+    #[cfg(not(debug_assertions))]
     pub fn write_file(&self) -> Result<(), &'static str> {
         let path = get_config_path();
         let contents = toml::to_string(&self).expect("Can't serialize config.");
@@ -192,18 +197,20 @@ pub fn init_logger() {
     env_logger::init();
 }
 
-/// Returs the logger middleware
+/// Returns the logger middleware
 pub fn logger_middleware() -> Logger {
-    cfg_if! {
-        if #[cfg(debug_assertions)] {
-            dotenv::dotenv().ok();
-            if let Ok(format) = env::var("LOG_FORMAT") {
-                Logger::new(&format)
-            } else {
-                Logger::default()
-            }
+    #[cfg(debug_assertions)]
+    {
+        dotenv::dotenv().ok();
+        if let Ok(format) = env::var("LOG_FORMAT") {
+            Logger::new(&format)
         } else {
             Logger::default()
         }
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        Logger::default()
     }
 }
