@@ -58,6 +58,24 @@ fn find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, actix
     }
 }
 
+/// DELETE an entry
+macro_rules! delete {
+    ($m:ident) => {
+        pub fn delete(
+            path: web::Path<String>,
+            pool: web::Data<Pool>,
+        ) -> impl Future<Item = HttpResponse, Error = Error> {
+            let id = parse_id!(&path);
+            Either::A(web::block(move || queries::$m::delete(id, pool)).then(
+                |result| match result {
+                    Ok(()) => Ok(HttpResponse::NoContent().finish()),
+                    Err(e) => find_error(e),
+                },
+            ))
+        }
+    };
+}
+
 /// Formats a timestamp to the "Last-Modified" header format
 fn timestamp_to_last_modified(timestamp: i32) -> String {
     let datetime =
@@ -177,6 +195,8 @@ pub mod files {
             }),
         )
     }
+
+    delete!(files);
 }
 
 pub mod links {
@@ -225,6 +245,8 @@ pub mod links {
             pool
         ))))
     }
+
+    delete!(links);
 }
 
 pub mod texts {
@@ -272,4 +294,6 @@ pub mod texts {
             pool
         ))))
     }
+
+    delete!(texts);
 }

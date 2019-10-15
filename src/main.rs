@@ -83,10 +83,19 @@ fn main() {
                     .data(web::Json::<handlers::files::PutFile>::configure(|cfg| {
                         cfg.limit(max_filesize)
                     }))
-                    .route(web::put().to_async(handlers::files::put)),
+                    .route(web::put().to_async(handlers::files::put))
+                    .route(web::delete().to_async(handlers::files::delete)),
             )
-            .service(web::resource("/l/{id}").route(web::put().to_async(handlers::links::put)))
-            .service(web::resource("/t/{id}").route(web::put().to_async(handlers::texts::put)))
+            .service(
+                web::resource("/l/{id}")
+                    .route(web::put().to_async(handlers::links::put))
+                    .route(web::delete().to_async(handlers::links::delete)),
+            )
+            .service(
+                web::resource("/t/{id}")
+                    .route(web::put().to_async(handlers::texts::put))
+                    .route(web::delete().to_async(handlers::texts::delete)),
+            )
     })
     .bind(&format!("localhost:{}", port))
     .unwrap_or_else(|e| {
