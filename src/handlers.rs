@@ -1,5 +1,6 @@
 use crate::setup::Config;
 
+use actix_web::error::BlockingError;
 use actix_web::{web, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::num;
@@ -36,13 +37,7 @@ macro_rules! parse_id {
     };
 }
 
-/// Formats a timestamp to the "Last-Modified" header format
-fn timestamp_to_last_modified(timestamp: i32) -> String {
-    let datetime =
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp as i64, 0), Utc);
-    datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
-}
-
+/// Match result from REPLACE queries
 macro_rules! put_then {
     ($f:expr) => {
         $f.then(|result| match result {
@@ -52,14 +47,31 @@ macro_rules! put_then {
     };
 }
 
+/// Handles error from single GET queries using find
+fn find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, actix_web::Error> {
+    match error {
+        BlockingError::Error(e) => match e {
+            diesel::result::Error::NotFound => Err(HttpResponse::NotFound().finish().into()),
+            _ => Err(HttpResponse::InternalServerError().finish().into()),
+        },
+        BlockingError::Canceled => Err(HttpResponse::InternalServerError().finish().into()),
+    }
+}
+
+/// Formats a timestamp to the "Last-Modified" header format
+fn timestamp_to_last_modified(timestamp: i32) -> String {
+    let datetime =
+        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp as i64, 0), Utc);
+    datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
+}
+
 /// GET the config info
 pub fn get_config(config: web::Data<Config>) -> impl Responder {
     HttpResponse::Ok().json(config.get_ref())
 }
 
 pub mod files {
-    use crate::handlers::id_from_b36;
-
+    use crate::handlers::{find_error, id_from_b36};
     use crate::queries::{self, SelectFilters, SelectQuery};
     use crate::setup::Config;
     use crate::Pool;
@@ -93,7 +105,7 @@ pub mod files {
                         Err(_) => Err(HttpResponse::NotFound().finish().into()),
                     }
                 }
-                Err(_) => Err(HttpResponse::NotFound().finish().into()),
+                Err(e) => find_error(e),
             }),
         )
     }
@@ -168,8 +180,7 @@ pub mod files {
 }
 
 pub mod links {
-    use crate::handlers::{id_from_b36, timestamp_to_last_modified};
-
+    use crate::handlers::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::queries::{self, SelectFilters, SelectQuery};
     use crate::Pool;
 
@@ -191,7 +202,7 @@ pub mod links {
                     .header("Location", link.forward)
                     .header("Last-Modified", timestamp_to_last_modified(link.created))
                     .finish()),
-                Err(_) => Err(HttpResponse::NotFound().finish().into()),
+                Err(e) => find_error(e),
             }),
         )
     }
@@ -217,8 +228,7 @@ pub mod links {
 }
 
 pub mod texts {
-    use crate::handlers::{id_from_b36, timestamp_to_last_modified};
-
+    use crate::handlers::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::queries::{self, SelectFilters, SelectQuery};
     use crate::Pool;
 
@@ -239,7 +249,7 @@ pub mod texts {
                 Ok(text) => Ok(HttpResponse::Ok()
                     .header("Last-Modified", timestamp_to_last_modified(text.created))
                     .body(text.contents)),
-                Err(_) => Err(HttpResponse::NotFound().finish().into()),
+                Err(e) => find_error(e),
             }),
         )
     }
