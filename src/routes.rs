@@ -1,3 +1,5 @@
+//! Actix route handlers
+
 use crate::setup::Config;
 
 use actix_web::error::BlockingError;
@@ -89,8 +91,8 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 }
 
 pub mod files {
-    use crate::handlers::{find_error, id_from_b36};
     use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::routes::{find_error, id_from_b36};
     use crate::setup::Config;
     use crate::Pool;
 
@@ -189,8 +191,8 @@ pub mod files {
 }
 
 pub mod links {
-    use crate::handlers::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::routes::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
@@ -239,8 +241,8 @@ pub mod links {
 }
 
 pub mod texts {
-    use crate::handlers::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::queries::{self, SelectFilters, SelectQuery};
+    use crate::routes::{find_error, id_from_b36, timestamp_to_last_modified};
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};

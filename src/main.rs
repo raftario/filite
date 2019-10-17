@@ -16,9 +16,9 @@ use std::process;
 #[cfg(not(debug_assertions))]
 use std::fs;
 
-pub mod handlers;
 pub mod models;
 pub mod queries;
+pub mod routes;
 pub mod schema;
 pub mod setup;
 
@@ -82,30 +82,30 @@ fn main() {
             .data(config.clone())
             .data(pool.clone())
             .wrap(setup::logger_middleware())
-            .service(web::resource("/config").route(web::get().to(handlers::get_config)))
-            .service(web::resource("/f").route(web::get().to_async(handlers::files::gets)))
-            .service(web::resource("/l").route(web::get().to_async(handlers::links::gets)))
-            .service(web::resource("/t").route(web::get().to_async(handlers::texts::gets)))
-            .route("/f/{id}", web::get().to_async(handlers::files::get))
-            .route("/l/{id}", web::get().to_async(handlers::links::get))
-            .route("/t/{id}", web::get().to_async(handlers::texts::get))
+            .service(web::resource("/config").route(web::get().to(routes::get_config)))
+            .service(web::resource("/f").route(web::get().to_async(routes::files::gets)))
+            .service(web::resource("/l").route(web::get().to_async(routes::links::gets)))
+            .service(web::resource("/t").route(web::get().to_async(routes::texts::gets)))
+            .route("/f/{id}", web::get().to_async(routes::files::get))
+            .route("/l/{id}", web::get().to_async(routes::links::get))
+            .route("/t/{id}", web::get().to_async(routes::texts::get))
             .service(
                 web::resource("/f/{id}")
-                    .data(web::Json::<handlers::files::PutFile>::configure(|cfg| {
+                    .data(web::Json::<routes::files::PutFile>::configure(|cfg| {
                         cfg.limit(max_filesize)
                     }))
-                    .route(web::put().to_async(handlers::files::put))
-                    .route(web::delete().to_async(handlers::files::delete)),
+                    .route(web::put().to_async(routes::files::put))
+                    .route(web::delete().to_async(routes::files::delete)),
             )
             .service(
                 web::resource("/l/{id}")
-                    .route(web::put().to_async(handlers::links::put))
-                    .route(web::delete().to_async(handlers::links::delete)),
+                    .route(web::put().to_async(routes::links::put))
+                    .route(web::delete().to_async(routes::links::delete)),
             )
             .service(
                 web::resource("/t/{id}")
-                    .route(web::put().to_async(handlers::texts::put))
-                    .route(web::delete().to_async(handlers::texts::delete)),
+                    .route(web::put().to_async(routes::texts::put))
+                    .route(web::delete().to_async(routes::texts::delete)),
             )
     })
     .bind(&format!("localhost:{}", port))
