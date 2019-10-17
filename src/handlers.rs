@@ -97,7 +97,7 @@ pub mod files {
     use actix_files::NamedFile;
     use actix_web::error::BlockingError;
     use actix_web::{http, web, Error, HttpResponse};
-    use chrono::{Datelike, Utc};
+    use chrono::Utc;
     use futures::future::{self, Either};
     use futures::Future;
     use std::fs;
@@ -146,23 +146,12 @@ pub mod files {
             web::block(move || {
                 let mut path = config.files_dir.clone();
                 let mut relative_path = PathBuf::new();
-
-                let current_time = Utc::now();
-                let current_date = current_time.date().naive_utc();
-                path.push(&format!("{:04}", current_date.year()));
-                relative_path.push(&format!("{:04}", current_date.year()));
-                path.push(&format!("{:02}", current_date.month()));
-                relative_path.push(&format!("{:02}", current_date.month()));
-                path.push(&format!("{:02}", current_date.day()));
-                relative_path.push(&format!("{:02}", current_date.day()));
-
                 if fs::create_dir_all(&path).is_err() {
                     return Err(http::StatusCode::from_u16(500).unwrap());
                 }
 
                 let mut filename = body.filename.clone();
-                let timestamp = format!("{:x}.", current_time.timestamp());
-                filename.insert_str(0, &timestamp);
+                filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
                 path.push(&filename);
                 relative_path.push(&filename);
 
