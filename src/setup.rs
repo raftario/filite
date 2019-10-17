@@ -9,11 +9,15 @@ use std::env;
 use std::path::PathBuf;
 
 #[cfg(not(debug_assertions))]
+use blake2::{Blake2b, Digest};
+#[cfg(not(debug_assertions))]
 use dirs;
 #[cfg(debug_assertions)]
 use dotenv;
 #[cfg(not(debug_assertions))]
 use std::fs;
+#[cfg(not(debug_assertions))]
+use std::io::{self, BufRead};
 #[cfg(not(debug_assertions))]
 use std::process;
 #[cfg(debug_assertions)]
@@ -229,16 +233,36 @@ pub fn logger_middleware() -> Logger {
 pub fn init() -> Config {
     let data_dir = get_data_dir();
     if !data_dir.exists() {
-        eprintln!("Creating config file...");
+        eprintln!("Generating config file...");
         fs::create_dir_all(&data_dir)
             .unwrap_or_else(|e| eprintln!("Can't create config directory: {}.", e));
         Config::default().write_file().unwrap_or_else(|e| {
             eprintln!("{}", e);
             process::exit(1);
         });
+
+        let stdin = io::stdin();
+        let mut stdin = stdin.lock();
+        eprintln!("Enter the login token to use:");
+        let mut token = String::new();
+        stdin.read_line(&mut token).unwrap_or_else(|e| {
+            eprintln!("Can't read token: {}", e);
+            process::exit(1);
+        });
+        let mut hasher = Blake2b::new();
+        hasher.input(&token);
+        let mut token_path = data_dir.clone();
+        token_path.push("token");
+        fs::write(&token_path, hasher.result().as_slice()).unwrap_or_else(|e| {
+            eprintln!("Can't write token: {}", e);
+            process::exit(1);
+        });
+
+        let mut config_path = data_dir.clone();
+        config_path.push("config.toml");
         eprintln!(
-            "To get started, edit the config file at {:?} and restart.",
-            &data_dir
+            "Almost ready. To get started, edit the config file at {} and restart.",
+            &config_path.to_str().unwrap(),
         );
         process::exit(0);
     }
