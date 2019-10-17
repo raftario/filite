@@ -14,6 +14,8 @@ use dirs;
 use dotenv;
 #[cfg(not(debug_assertions))]
 use std::fs;
+#[cfg(not(debug_assertions))]
+use std::process;
 #[cfg(debug_assertions)]
 use std::str::FromStr;
 #[cfg(not(debug_assertions))]
@@ -220,4 +222,29 @@ pub fn logger_middleware() -> Logger {
     {
         Logger::default()
     }
+}
+
+/// Performs the initial setup
+#[cfg(not(debug_assertions))]
+pub fn init() -> Config {
+    let data_dir = get_data_dir();
+    if !data_dir.exists() {
+        eprintln!("Creating config file...");
+        fs::create_dir_all(&data_dir)
+            .unwrap_or_else(|e| eprintln!("Can't create config directory: {}.", e));
+        Config::default().write_file().unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            process::exit(1);
+        });
+        eprintln!(
+            "To get started, edit the config file at {:?} and restart.",
+            &data_dir
+        );
+        process::exit(0);
+    }
+
+    Config::read_file().unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        process::exit(1);
+    })
 }

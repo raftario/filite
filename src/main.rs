@@ -6,15 +6,13 @@ extern crate serde;
 #[cfg_attr(not(debug_assertions), macro_use)]
 extern crate diesel_migrations;
 
+#[cfg(debug_assertions)]
 use crate::setup::Config;
 
 use actix_web::{web, App, FromRequest, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use std::process;
-
-#[cfg(not(debug_assertions))]
-use std::fs;
 
 pub mod models;
 pub mod queries;
@@ -28,31 +26,6 @@ pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 #[cfg(not(debug_assertions))]
 embed_migrations!("./migrations");
 
-/// Performs the initial setup
-#[cfg(not(debug_assertions))]
-fn init() -> Config {
-    let data_dir = setup::get_data_dir();
-    if !data_dir.exists() {
-        eprintln!("Creating config file...");
-        fs::create_dir_all(&data_dir)
-            .unwrap_or_else(|e| eprintln!("Can't create config directory: {}.", e));
-        Config::default().write_file().unwrap_or_else(|e| {
-            eprintln!("{}", e);
-            process::exit(1);
-        });
-        eprintln!(
-            "To get started, edit the config file at {:?} and restart.",
-            &data_dir
-        );
-        process::exit(0);
-    }
-
-    Config::read_file().unwrap_or_else(|e| {
-        eprintln!("{}", e);
-        process::exit(1);
-    })
-}
-
 fn main() {
     let config = {
         #[cfg(debug_assertions)]
@@ -62,7 +35,7 @@ fn main() {
 
         #[cfg(not(debug_assertions))]
         {
-            init()
+            setup::init()
         }
     };
     setup::init_logger();
