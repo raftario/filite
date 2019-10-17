@@ -8,12 +8,16 @@ use diesel::sqlite::SqliteConnection;
 use std::env;
 use std::path::PathBuf;
 
+#[cfg(not(debug_assertions))]
+use dirs;
 #[cfg(debug_assertions)]
 use dotenv;
 #[cfg(not(debug_assertions))]
 use std::fs;
 #[cfg(debug_assertions)]
 use std::str::FromStr;
+#[cfg(not(debug_assertions))]
+use toml;
 
 /// Returns a path to the directory storing application data
 #[cfg(not(debug_assertions))]
@@ -32,6 +36,7 @@ fn get_config_path() -> PathBuf {
 }
 
 /// Returns an environment variable and panic if it isn't found
+#[cfg(debug_assertions)]
 macro_rules! get_env {
     ($k:literal) => {
         env::var($k).expect(&format!("Can't find {} environment variable.", $k));
@@ -39,6 +44,7 @@ macro_rules! get_env {
 }
 
 /// Returns a parsed environment variable and panic if it isn't found or is not parsable
+#[cfg(debug_assertions)]
 macro_rules! parse_env {
     ($k:literal) => {
         get_env!($k).parse().expect(&format!("Invalid {}.", $k))
