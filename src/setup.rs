@@ -16,6 +16,7 @@ use std::fs;
 use std::str::FromStr;
 
 /// Returns a path to the directory storing application data
+#[cfg(not(debug_assertions))]
 pub fn get_data_dir() -> PathBuf {
     let mut dir = dirs::home_dir().expect("Can't find home directory.");
     dir.push(".filite");
