@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 actix-files = "0.1.5"
+actix-identity = "0.1.0"
 actix-web = "1.0.8"
 base64 = "0.10.1"
 blake2 = "0.8.1"
