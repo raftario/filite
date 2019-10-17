@@ -3,6 +3,9 @@ extern crate diesel;
 #[macro_use]
 extern crate serde;
 
+#[cfg_attr(not(debug_assertions), macro_use)]
+extern crate diesel_migrations;
+
 use crate::setup::Config;
 
 use actix_web::{web, App, FromRequest, HttpServer};
@@ -21,6 +24,9 @@ pub mod setup;
 
 /// SQLite database connection pool
 pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+
+#[cfg(not(debug_assertions))]
+embed_migrations!("./migrations");
 
 /// Performs the initial setup
 #[cfg(not(debug_assertions))]
@@ -62,6 +68,11 @@ fn main() {
     setup::init_logger();
 
     let pool = setup::create_pool(&config.database_url, config.pool_size);
+    #[cfg(not(debug_assertions))]
+    embedded_migrations::run(&pool.get().unwrap()).unwrap_or_else(|e| {
+        eprintln!("Can't prepare database: {}.", e);
+        process::exit(1);
+    });
 
     let port = config.port;
     let max_filesize = (config.max_filesize as f64 * 1.37) as usize;
