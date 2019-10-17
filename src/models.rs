@@ -63,6 +63,8 @@ pub mod texts {
         pub id: i32,
         /// Text contents
         pub contents: String,
+        /// Whether to use syntax highlighting or not when serving that text
+        pub highlight: i32,
         /// Creation date and time as a UNIX timestamp
         pub created: i32,
     }
@@ -73,7 +75,9 @@ pub mod texts {
     pub struct NewText<'a> {
         /// Primary key, its radix 36 value is used as an url
         pub id: i32,
-        /// Text to serve
+        /// Text contents
         pub contents: &'a str,
+        /// Whether to use syntax highlighting or not when serving that text
+        pub highlight: i32,
     }
 }

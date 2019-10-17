@@ -280,6 +280,7 @@ pub mod texts {
     #[derive(Deserialize)]
     pub struct PutText {
         pub contents: String,
+        pub highlight: bool,
     }
 
     /// PUT a new text entry
@@ -291,6 +292,7 @@ pub mod texts {
         Either::A(put_then!(web::block(move || queries::texts::replace(
             id,
             &body.contents,
+            body.highlight,
             pool
         ))))
     }
