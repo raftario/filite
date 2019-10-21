@@ -5,7 +5,7 @@ authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
 
 [dependencies]
-actix-files = "0.1.5"
+actix-files = "0.1.6"
 actix-identity = "0.1.0"
 actix-web = "1.0.8"
 base64 = "0.10.1"
@@ -14,15 +14,15 @@ chrono = "0.4.9"
 diesel_migrations = "1.4.0"
 dirs = "2.0.2"
 dotenv = { version = "0.14.1", optional = true }
-env_logger = "0.7.0"
+env_logger = "0.7.1"
 futures = "0.1.29"
 num_cpus = "1.10.1"
 toml = "0.5.3"
 [dependencies.diesel]
-version = "1.4.2"
+version = "1.4.3"
 features = ["r2d2", "sqlite"]
 [dependencies.libsqlite3-sys]
-version = "0.12.0"
+version = "0.16.0"
 features = ["bundled"]
 [dependencies.serde]
 version = "1.0.101"
