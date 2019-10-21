@@ -18,25 +18,27 @@ fn parse_id(id: &str) -> Result<i32, HttpResponse> {
 
 /// Checks for authentication
 fn auth(identity: Identity, request: HttpRequest, token_hash: &[u8]) -> Result<(), HttpResponse> {
-    match identity.identity().is_some() {
-        true => Ok(()),
-        false => match request.headers().get("Authorization") {
-            Some(header) => match header.to_str() {
-                Ok(header) => {
-                    let token = header.replace("Bearer ", "");
-                    match setup::hash(&token).as_slice() == token_hash {
-                        true => Ok(()),
-                        false => Err(HttpResponse::Unauthorized()
-                            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
-                            .finish()),
-                    }
-                }
-                Err(_) => Err(HttpResponse::BadRequest().finish()),
-            },
-            None => Err(HttpResponse::Unauthorized()
-                .header("WWW-Authenticate", "Bearer realm=\"filite\"")
-                .finish()),
+    if identity.identity().is_some() {
+        return Ok(());
+    }
+
+    let header = match request.headers().get("Authorization") {
+        Some(h) => match h.to_str() {
+            Ok(h) => h,
+            Err(_) => return Err(HttpResponse::BadRequest().finish()),
         },
+        None => {
+            return Err(HttpResponse::Unauthorized()
+                .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+                .finish())
+        }
+    };
+    let token = header.replace("Bearer ", "");
+    match setup::hash(&token).as_slice() == token_hash {
+        true => Ok(()),
+        false => Err(HttpResponse::Unauthorized()
+            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+            .finish()),
     }
 }
 
