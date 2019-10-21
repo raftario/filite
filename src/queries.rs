@@ -78,15 +78,14 @@ macro_rules! delete {
 
 /// Queries affecting the `files` table
 pub mod files {
-    use crate::models::files::*;
-    use crate::queries::SelectFilters;
-    use crate::schema::files::dsl::*;
-    use crate::schema::files::table;
-    use crate::Pool;
-
+    use crate::{
+        models::files::*,
+        queries::SelectFilters,
+        schema::files::{dsl::*, table},
+        Pool,
+    };
     use actix_web::web::Data;
-    use diesel::prelude::*;
-    use diesel::result::QueryResult;
+    use diesel::{prelude::*, result::QueryResult};
 
     /// SELECT multiple file entries
     pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<File>> {
@@ -117,15 +116,14 @@ pub mod files {
 
 /// Queries affecting the `links` table
 pub mod links {
-    use crate::models::links::*;
-    use crate::queries::SelectFilters;
-    use crate::schema::links::dsl::*;
-    use crate::schema::links::table;
-    use crate::Pool;
-
+    use crate::{
+        models::links::*,
+        queries::SelectFilters,
+        schema::links::{dsl::*, table},
+        Pool,
+    };
     use actix_web::web::Data;
-    use diesel::prelude::*;
-    use diesel::result::QueryResult;
+    use diesel::{prelude::*, result::QueryResult};
 
     /// SELECT multiple link entries
     pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<Link>> {
@@ -156,15 +154,14 @@ pub mod links {
 
 /// Queries affecting the `texts` table
 pub mod texts {
-    use crate::models::texts::*;
-    use crate::queries::SelectFilters;
-    use crate::schema::texts::dsl::*;
-    use crate::schema::texts::table;
-    use crate::Pool;
-
+    use crate::{
+        models::texts::*,
+        queries::SelectFilters,
+        schema::texts::{dsl::*, table},
+        Pool,
+    };
     use actix_web::web::Data;
-    use diesel::prelude::*;
-    use diesel::result::QueryResult;
+    use diesel::{prelude::*, result::QueryResult};
 
     /// SELECT multiple text entries
     pub fn select(filters: SelectFilters, pool: Data<Pool>) -> QueryResult<Vec<Text>> {

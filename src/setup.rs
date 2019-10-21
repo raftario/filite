@@ -1,26 +1,26 @@
 //! Utilities used during the initial setup
 
 use crate::Pool;
-
 use actix_web::middleware::Logger;
 use blake2::{Blake2b, Digest};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
-use std::env;
-use std::path::PathBuf;
+use diesel::{
+    r2d2::{self, ConnectionManager},
+    sqlite::SqliteConnection,
+};
+use std::{env, path::PathBuf};
 
 #[cfg(not(feature = "dev"))]
 use dirs;
 #[cfg(feature = "dev")]
 use dotenv;
-#[cfg(not(feature = "dev"))]
-use std::fs;
-#[cfg(not(feature = "dev"))]
-use std::io::{self, BufRead};
-#[cfg(not(feature = "dev"))]
-use std::process;
 #[cfg(feature = "dev")]
 use std::str::FromStr;
+#[cfg(not(feature = "dev"))]
+use std::{
+    fs,
+    io::{self, BufRead},
+    process,
+};
 #[cfg(not(feature = "dev"))]
 use toml;
 

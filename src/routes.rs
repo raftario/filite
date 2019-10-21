@@ -1,9 +1,7 @@
 //! Actix route handlers
 
 use crate::setup::Config;
-
-use actix_web::error::BlockingError;
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{error::BlockingError, web, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use futures::future::{self, FutureResult};
@@ -92,18 +90,17 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 }
 
 pub mod files {
-    use crate::queries::{self, SelectQuery};
-    use crate::routes::{match_find_error, parse_id};
-    use crate::setup::Config;
-    use crate::Pool;
-
+    use crate::{
+        queries::{self, SelectQuery},
+        routes::{match_find_error, parse_id},
+        setup::Config,
+        Pool,
+    };
     use actix_files::NamedFile;
-    use actix_web::error::BlockingError;
-    use actix_web::{http, web, Error, HttpResponse};
+    use actix_web::{error::BlockingError, http, web, Error, HttpResponse};
     use chrono::Utc;
     use futures::Future;
-    use std::fs;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     select!(files);
 
@@ -194,12 +191,11 @@ pub mod files {
 }
 
 pub mod links {
-    use crate::queries::{self, SelectQuery};
-    use crate::routes::{
-        match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+    use crate::{
+        queries::{self, SelectQuery},
+        routes::{match_find_error, match_replace_result, parse_id, timestamp_to_last_modified},
+        Pool,
     };
-    use crate::Pool;
-
     use actix_web::{web, Error, HttpResponse};
     use futures::Future;
 
@@ -246,12 +242,11 @@ pub mod links {
 }
 
 pub mod texts {
-    use crate::queries::{self, SelectQuery};
-    use crate::routes::{
-        match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+    use crate::{
+        queries::{self, SelectQuery},
+        routes::{match_find_error, match_replace_result, parse_id, timestamp_to_last_modified},
+        Pool,
     };
-    use crate::Pool;
-
     use actix_web::{web, Error, HttpResponse};
     use futures::Future;
 

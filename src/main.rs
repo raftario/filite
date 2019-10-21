@@ -6,14 +6,15 @@ extern crate serde;
 #[cfg_attr(not(feature = "dev"), macro_use)]
 extern crate diesel_migrations;
 
-#[cfg(feature = "dev")]
-use crate::setup::Config;
-
 use actix_web::{web, App, FromRequest, HttpServer};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
+use diesel::{
+    r2d2::{self, ConnectionManager},
+    sqlite::SqliteConnection,
+};
 use std::process;
 
+#[cfg(feature = "dev")]
+use crate::setup::Config;
 #[cfg(feature = "dev")]
 use dotenv;
 #[cfg(not(feature = "dev"))]
