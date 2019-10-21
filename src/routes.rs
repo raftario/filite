@@ -5,36 +5,37 @@ use crate::setup::Config;
 use actix_web::error::BlockingError;
 use actix_web::{web, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use std::num;
 
 /// GET multiple entries
 macro_rules! select {
     ($m:ident) => {
         pub fn gets(
-            query: web::Query<SelectQuery>,
-            pool: web::Data<Pool>,
-        ) -> impl Future<Item = HttpResponse, Error = Error> {
-            let filters = SelectFilters::from(query.into_inner());
-            web::block(move || queries::$m::select(filters, pool)).then(|result| match result {
-                Ok(x) => Ok(HttpResponse::Ok().json(x)),
-                Err(_) => Err(HttpResponse::InternalServerError().finish().into()),
-            })
+            query: actix_web::web::Query<SelectQuery>,
+            pool: actix_web::web::Data<Pool>,
+        ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
+            let filters = crate::queries::SelectFilters::from(query.into_inner());
+            actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
+                |result| match result {
+                    Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
+                    Err(_) => Err(actix_web::HttpResponse::InternalServerError()
+                        .finish()
+                        .into()),
+                },
+            )
         }
     };
-}
-
-/// Parses a base 36 ID
-#[inline(always)]
-fn id_from_b36(s: &str) -> Result<i32, num::ParseIntError> {
-    i32::from_str_radix(s, 36)
 }
 
 /// Parses an ID and errors if it fails
 macro_rules! parse_id {
     ($s:expr) => {
-        match id_from_b36($s) {
+        match i32::from_str_radix($s, 36) {
             Ok(id) => id,
-            Err(_) => return Either::B(future::err(HttpResponse::BadRequest().finish().into())),
+            Err(_) => {
+                return futures::future::Either::B(future::err(
+                    HttpResponse::BadRequest().finish().into(),
+                ))
+            }
         };
     };
 }
@@ -43,8 +44,10 @@ macro_rules! parse_id {
 macro_rules! put_then {
     ($f:expr) => {
         $f.then(|result| match result {
-            Ok(x) => Ok(HttpResponse::Created().json(x)),
-            Err(_) => Err(HttpResponse::InternalServerError().finish().into()),
+            Ok(x) => Ok(actix_web::HttpResponse::Created().json(x)),
+            Err(_) => Err(actix_web::HttpResponse::InternalServerError()
+                .finish()
+                .into()),
         })
     };
 }
@@ -65,16 +68,18 @@ fn find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, actix
 macro_rules! delete {
     ($m:ident) => {
         pub fn delete(
-            path: web::Path<String>,
-            pool: web::Data<Pool>,
-        ) -> impl Future<Item = HttpResponse, Error = Error> {
+            path: actix_web::web::Path<String>,
+            pool: actix_web::web::Data<Pool>,
+        ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
             let id = parse_id!(&path);
-            Either::A(web::block(move || queries::$m::delete(id, pool)).then(
-                |result| match result {
-                    Ok(()) => Ok(HttpResponse::NoContent().finish()),
-                    Err(e) => find_error(e),
-                },
-            ))
+            futures::future::Either::A(
+                actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
+                    |result| match result {
+                        Ok(()) => Ok(actix_web::HttpResponse::NoContent().finish()),
+                        Err(e) => crate::routes::find_error(e),
+                    },
+                ),
+            )
         }
     };
 }
@@ -92,8 +97,8 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 }
 
 pub mod files {
-    use crate::queries::{self, SelectFilters, SelectQuery};
-    use crate::routes::{find_error, id_from_b36};
+    use crate::queries::{self, SelectQuery};
+    use crate::routes::find_error;
     use crate::setup::Config;
     use crate::Pool;
 
@@ -192,8 +197,8 @@ pub mod files {
 }
 
 pub mod links {
-    use crate::queries::{self, SelectFilters, SelectQuery};
-    use crate::routes::{find_error, id_from_b36, timestamp_to_last_modified};
+    use crate::queries::{self, SelectQuery};
+    use crate::routes::{find_error, timestamp_to_last_modified};
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
@@ -242,8 +247,8 @@ pub mod links {
 }
 
 pub mod texts {
-    use crate::queries::{self, SelectFilters, SelectQuery};
-    use crate::routes::{find_error, id_from_b36, timestamp_to_last_modified};
+    use crate::queries::{self, SelectQuery};
+    use crate::routes::{find_error, timestamp_to_last_modified};
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
