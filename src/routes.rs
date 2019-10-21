@@ -3,6 +3,7 @@
 use crate::setup::{self, Config};
 use actix_identity::Identity;
 use actix_web::{error::BlockingError, web, HttpRequest, HttpResponse, Responder};
+use base64;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use serde::Serialize;
@@ -26,14 +27,14 @@ fn auth(identity: Identity, request: HttpRequest, token_hash: &[u8]) -> Result<(
                     match setup::hash(&token).as_slice() == token_hash {
                         true => Ok(()),
                         false => Err(HttpResponse::Unauthorized()
-                            .header("WWW-Authenticate", "Bearer")
+                            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
                             .finish()),
                     }
                 }
                 Err(_) => Err(HttpResponse::BadRequest().finish()),
             },
             None => Err(HttpResponse::Unauthorized()
-                .header("WWW-Authenticate", "Bearer")
+                .header("WWW-Authenticate", "Bearer realm=\"filite\"")
                 .finish()),
         },
     }
@@ -133,6 +134,73 @@ pub fn get_config(
     }
 }
 
+/// Login route
+pub fn login(
+    request: HttpRequest,
+    identity: Identity,
+    token_hash: web::Data<Vec<u8>>,
+) -> impl Responder {
+    if identity.identity().is_some() {
+        return HttpResponse::Found()
+            .header("Location", request.uri().to_string().replace("/login", ""))
+            .finish();
+    }
+
+    let header = match request.headers().get("Authorization") {
+        Some(h) => match h.to_str() {
+            Ok(h) => h,
+            Err(_) => return HttpResponse::BadRequest().finish(),
+        },
+        None => {
+            return HttpResponse::Unauthorized()
+                .header("WWW-Authenticate", "Basic realm=\"filite\"")
+                .finish()
+        }
+    };
+    let connection_string = header.replace("Basic ", "");
+    let (user, token) = match base64::decode(&connection_string) {
+        Ok(c) => {
+            let credentials: Vec<Vec<u8>> =
+                c.splitn(2, |b| b == &b':').map(|s| s.to_vec()).collect();
+            match credentials.len() {
+                2 => (credentials[0].clone(), credentials[1].clone()),
+                _ => return HttpResponse::BadRequest().finish(),
+            }
+        }
+        Err(_) => return HttpResponse::BadRequest().finish(),
+    };
+
+    match setup::hash(token).as_slice() == token_hash.as_slice() {
+        true => match String::from_utf8(user.to_vec()) {
+            Ok(u) => {
+                identity.remember(u);
+                HttpResponse::Found()
+                    .header("Location", request.uri().to_string().replace("/login", ""))
+                    .finish()
+            }
+            Err(_) => HttpResponse::BadRequest().finish(),
+        },
+        false => HttpResponse::Unauthorized()
+            .header("WWW-Authenticate", "Basic realm=\"filite\"")
+            .finish(),
+    }
+}
+
+/// Logout route
+pub fn logout(request: HttpRequest, identity: Identity) -> impl Responder {
+    match identity.identity().is_some() {
+        true => {
+            identity.forget();
+            HttpResponse::Found()
+                .header("Location", request.uri().to_string().replace("/login", ""))
+                .finish()
+        }
+        false => HttpResponse::Unauthorized()
+            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+            .finish(),
+    }
+}
+
 pub mod files {
     use crate::{
         queries::{self, SelectQuery},
@@ -141,6 +209,7 @@ pub mod files {
         Pool,
     };
     use actix_files::NamedFile;
+    use actix_identity::Identity;
     use actix_web::{error::BlockingError, http, web, Error, HttpRequest, HttpResponse};
     use chrono::Utc;
     use futures::{future, Future};
@@ -187,8 +256,8 @@ pub mod files {
         body: web::Json<PutFile>,
         pool: web::Data<Pool>,
         config: web::Data<Config>,
-        identity: actix_identity::Identity,
-        token_hash: actix_web::web::Data<Vec<u8>>,
+        identity: Identity,
+        token_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         future::result(auth(identity, request, &token_hash))
             .and_then(move |_| future::result(parse_id(&path)))
@@ -247,6 +316,7 @@ pub mod links {
         },
         Pool,
     };
+    use actix_identity::Identity;
     use actix_web::{web, Error, HttpRequest, HttpResponse};
     use futures::{future, Future};
 
@@ -282,8 +352,8 @@ pub mod links {
         path: web::Path<String>,
         body: web::Json<PutLink>,
         pool: web::Data<Pool>,
-        identity: actix_identity::Identity,
-        token_hash: actix_web::web::Data<Vec<u8>>,
+        identity: Identity,
+        token_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         future::result(auth(identity, request, &token_hash))
             .and_then(move |_| future::result(parse_id(&path)))
@@ -305,6 +375,7 @@ pub mod texts {
         },
         Pool,
     };
+    use actix_identity::Identity;
     use actix_web::{web, Error, HttpRequest, HttpResponse};
     use futures::{future, Future};
 
@@ -340,8 +411,8 @@ pub mod texts {
         path: web::Path<String>,
         body: web::Json<PutText>,
         pool: web::Data<Pool>,
-        identity: actix_identity::Identity,
-        token_hash: actix_web::web::Data<Vec<u8>>,
+        identity: Identity,
+        token_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         future::result(auth(identity, request, &token_hash))
             .and_then(move |_| future::result(parse_id(&path)))
