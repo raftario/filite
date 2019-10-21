@@ -60,7 +60,7 @@ pub fn hash(input: &str) -> Vec<u8> {
 #[macro_export]
 macro_rules! get_env {
     ($k:literal) => {
-        std::env::var($k).expect(&format!("Can't find {} environment variable.", $k));
+        std::env::var($k).expect(&format!("Can't find {} environment variable", $k));
     };
 }
 
@@ -68,7 +68,7 @@ macro_rules! get_env {
 #[cfg(feature = "dev")]
 macro_rules! parse_env {
     ($k:literal) => {
-        get_env!($k).parse().expect(&format!("Invalid {}.", $k))
+        get_env!($k).parse().expect(&format!("Invalid {}", $k))
     };
 }
 
@@ -96,7 +96,7 @@ impl Default for Config {
             let mut path = get_data_dir();
             path.push("database.db");
             path.to_str()
-                .expect("Can't convert database path to string.")
+                .expect("Can't convert database path to string")
                 .to_owned()
         };
         let pool_size = num_cpus::get() as u32 / 2;
@@ -187,7 +187,7 @@ impl Config {
             } else {
                 let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
                 let mut cargo_manifest_dir = PathBuf::from_str(cargo_manifest_dir)
-                    .expect("Can't convert cargo manifest dir to path.");
+                    .expect("Can't convert cargo manifest dir to path");
                 cargo_manifest_dir.push(&path);
                 cargo_manifest_dir
                     .canonicalize()
@@ -212,7 +212,7 @@ pub fn create_pool(url: &str, size: u32) -> Pool {
     r2d2::Pool::builder()
         .max_size(size)
         .build(manager)
-        .expect("Can't create pool.")
+        .expect("Can't create pool")
 }
 
 /// Initializes the logger
