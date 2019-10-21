@@ -5,46 +5,36 @@ use actix_identity::Identity;
 use actix_web::{error::BlockingError, web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
-use futures::future::{self, FutureResult};
-use futures::Future;
 use serde::Serialize;
 
 /// Parses an ID
-fn parse_id(id: &str) -> FutureResult<i32, HttpResponse> {
+fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     match i32::from_str_radix(id, 36) {
-        Ok(id) => future::ok(id),
-        Err(_) => future::err(HttpResponse::BadRequest().finish()),
+        Ok(id) => Ok(id),
+        Err(_) => Err(HttpResponse::BadRequest().finish()),
     }
 }
 
 /// Checks for authentication
-fn auth(
-    identity: Identity,
-    request: HttpRequest,
-    token_hash: &[u8],
-) -> FutureResult<(), HttpResponse> {
+fn auth(identity: Identity, request: HttpRequest, token_hash: &[u8]) -> Result<(), HttpResponse> {
     match identity.identity().is_some() {
-        true => future::ok(()),
+        true => Ok(()),
         false => match request.headers().get("Authorization") {
             Some(header) => match header.to_str() {
                 Ok(header) => {
                     let token = header.replace("Bearer ", "");
                     match setup::hash(&token).as_slice() == token_hash {
-                        true => future::ok(()),
-                        false => future::err(
-                            HttpResponse::Unauthorized()
-                                .header("WWW-Authenticate", "Bearer")
-                                .finish(),
-                        ),
+                        true => Ok(()),
+                        false => Err(HttpResponse::Unauthorized()
+                            .header("WWW-Authenticate", "Bearer")
+                            .finish()),
                     }
                 }
-                Err(_) => future::err(HttpResponse::BadRequest().finish()),
+                Err(_) => Err(HttpResponse::BadRequest().finish()),
             },
-            None => future::err(
-                HttpResponse::Unauthorized()
-                    .header("WWW-Authenticate", "Bearer")
-                    .finish(),
-            ),
+            None => Err(HttpResponse::Unauthorized()
+                .header("WWW-Authenticate", "Bearer")
+                .finish()),
         },
     }
 }
@@ -90,7 +80,7 @@ macro_rules! select {
             token_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
             let filters = crate::queries::SelectFilters::from(query.into_inner());
-            crate::routes::auth(identity, request, &token_hash)
+            futures::future::result(crate::routes::auth(identity, request, &token_hash))
                 .and_then(move |_| {
                     actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
                         |result| match result {
@@ -114,8 +104,8 @@ macro_rules! delete {
             identity: actix_identity::Identity,
             token_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
-            crate::routes::auth(identity, request, &token_hash)
-                .and_then(move |_| crate::routes::parse_id(&path))
+            futures::future::result(crate::routes::auth(identity, request, &token_hash))
+                .and_then(move |_| futures::future::result(crate::routes::parse_id(&path)))
                 .and_then(move |id| {
                     actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
                         |result| match result {
@@ -137,7 +127,7 @@ pub fn get_config(
     identity: actix_identity::Identity,
     token_hash: actix_web::web::Data<Vec<u8>>,
 ) -> impl Responder {
-    match auth(identity, request, &token_hash).wait() {
+    match auth(identity, request, &token_hash) {
         Ok(_) => HttpResponse::Ok().json(config.get_ref()),
         Err(response) => response,
     }
@@ -153,7 +143,7 @@ pub mod files {
     use actix_files::NamedFile;
     use actix_web::{error::BlockingError, http, web, Error, HttpRequest, HttpResponse};
     use chrono::Utc;
-    use futures::Future;
+    use futures::{future, Future};
     use std::{fs, path::PathBuf};
 
     select!(files);
@@ -164,7 +154,7 @@ pub mod files {
         pool: web::Data<Pool>,
         config: web::Data<Config>,
     ) -> impl Future<Item = NamedFile, Error = Error> {
-        parse_id(&path)
+        future::result(parse_id(&path))
             .and_then(move |id| {
                 web::block(move || queries::files::find(id, pool)).then(
                     move |result| match result {
@@ -200,8 +190,8 @@ pub mod files {
         identity: actix_identity::Identity,
         token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        auth(identity, request, &token_hash)
-            .and_then(move |_| parse_id(&path))
+        future::result(auth(identity, request, &token_hash))
+            .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || {
                 let mut path = config.files_dir.clone();
@@ -258,7 +248,7 @@ pub mod links {
         Pool,
     };
     use actix_web::{web, Error, HttpRequest, HttpResponse};
-    use futures::Future;
+    use futures::{future, Future};
 
     select!(links);
 
@@ -267,7 +257,7 @@ pub mod links {
         path: web::Path<String>,
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        parse_id(&path)
+        future::result(parse_id(&path))
             .and_then(move |id| {
                 web::block(move || queries::links::find(id, pool)).then(|result| match result {
                     Ok(link) => Ok(HttpResponse::Found()
@@ -295,8 +285,8 @@ pub mod links {
         identity: actix_identity::Identity,
         token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        auth(identity, request, &token_hash)
-            .and_then(move |_| parse_id(&path))
+        future::result(auth(identity, request, &token_hash))
+            .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || queries::links::replace(id, &body.forward, pool))
                     .then(|result| match_replace_result(result))
@@ -316,7 +306,7 @@ pub mod texts {
         Pool,
     };
     use actix_web::{web, Error, HttpRequest, HttpResponse};
-    use futures::Future;
+    use futures::{future, Future};
 
     select!(texts);
 
@@ -325,7 +315,7 @@ pub mod texts {
         path: web::Path<String>,
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        parse_id(&path)
+        future::result(parse_id(&path))
             .and_then(move |id| {
                 web::block(move || queries::texts::find(id, pool)).then(|result| match result {
                     Ok(text) => Ok(HttpResponse::Ok()
@@ -353,8 +343,8 @@ pub mod texts {
         identity: actix_identity::Identity,
         token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        auth(identity, request, &token_hash)
-            .and_then(move |_| parse_id(&path))
+        future::result(auth(identity, request, &token_hash))
+            .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || {
                     queries::texts::replace(id, &body.contents, body.highlight, pool)
