@@ -1,7 +1,8 @@
 //! Actix route handlers
 
-use crate::setup::Config;
-use actix_web::{error::BlockingError, web, HttpResponse, Responder};
+use crate::setup::{self, Config};
+use actix_identity::Identity;
+use actix_web::{error::BlockingError, web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use futures::future::{self, FutureResult};
@@ -12,6 +13,30 @@ fn parse_id(id: &str) -> FutureResult<i32, HttpResponse> {
     match i32::from_str_radix(id, 36) {
         Ok(id) => future::ok(id),
         Err(_) => future::err(HttpResponse::BadRequest().finish()),
+    }
+}
+
+/// Checks for authentication
+fn auth(
+    identity: Identity,
+    request: HttpRequest,
+    token_hash: &[u8],
+) -> FutureResult<(), HttpResponse> {
+    match identity.identity().is_some() {
+        true => future::ok(()),
+        false => match request.headers().get("Authorization") {
+            Some(header) => match header.to_str() {
+                Ok(header) => {
+                    let token: Vec<u8> = header.bytes().skip(7).collect();
+                    match setup::hash(&token).as_slice() == token_hash {
+                        true => future::ok(()),
+                        false => future::err(HttpResponse::Unauthorized().finish()),
+                    }
+                }
+                Err(_) => future::err(HttpResponse::BadRequest().finish()),
+            },
+            None => future::err(HttpResponse::Unauthorized().finish()),
+        },
     }
 }
 
@@ -49,14 +74,21 @@ fn timestamp_to_last_modified(timestamp: i32) -> String {
 macro_rules! select {
     ($m:ident) => {
         pub fn gets(
+            request: HttpRequest,
             query: actix_web::web::Query<SelectQuery>,
             pool: actix_web::web::Data<Pool>,
+            identity: actix_identity::Identity,
+            token_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
             let filters = crate::queries::SelectFilters::from(query.into_inner());
-            actix_web::web::block(move || crate::queries::$m::select(filters, pool))
-                .then(|result| match result {
-                    Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
-                    Err(_) => Err(actix_web::HttpResponse::InternalServerError().finish()),
+            crate::routes::auth(identity, request, &token_hash)
+                .and_then(move |_| {
+                    actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
+                        |result| match result {
+                            Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
+                            Err(_) => Err(actix_web::HttpResponse::InternalServerError().finish()),
+                        },
+                    )
                 })
                 .from_err()
         }
@@ -67,10 +99,14 @@ macro_rules! select {
 macro_rules! delete {
     ($m:ident) => {
         pub fn delete(
+            request: HttpRequest,
             path: actix_web::web::Path<String>,
             pool: actix_web::web::Data<Pool>,
+            identity: actix_identity::Identity,
+            token_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
-            crate::routes::parse_id(&path)
+            crate::routes::auth(identity, request, &token_hash)
+                .and_then(move |_| crate::routes::parse_id(&path))
                 .and_then(move |id| {
                     actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
                         |result| match result {
@@ -92,12 +128,12 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 pub mod files {
     use crate::{
         queries::{self, SelectQuery},
-        routes::{match_find_error, parse_id},
+        routes::{auth, match_find_error, parse_id},
         setup::Config,
         Pool,
     };
     use actix_files::NamedFile;
-    use actix_web::{error::BlockingError, http, web, Error, HttpResponse};
+    use actix_web::{error::BlockingError, http, web, Error, HttpRequest, HttpResponse};
     use chrono::Utc;
     use futures::Future;
     use std::{fs, path::PathBuf};
@@ -138,11 +174,16 @@ pub mod files {
 
     /// PUT a new file entry
     pub fn put(
-        (path, body): (web::Path<String>, web::Json<PutFile>),
+        request: HttpRequest,
+        path: web::Path<String>,
+        body: web::Json<PutFile>,
         config: web::Data<Config>,
         pool: web::Data<Pool>,
+        identity: actix_identity::Identity,
+        token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        parse_id(&path)
+        auth(identity, request, &token_hash)
+            .and_then(move |_| parse_id(&path))
             .and_then(move |id| {
                 web::block(move || {
                 let mut path = config.files_dir.clone();
@@ -193,10 +234,12 @@ pub mod files {
 pub mod links {
     use crate::{
         queries::{self, SelectQuery},
-        routes::{match_find_error, match_replace_result, parse_id, timestamp_to_last_modified},
+        routes::{
+            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+        },
         Pool,
     };
-    use actix_web::{web, Error, HttpResponse};
+    use actix_web::{web, Error, HttpRequest, HttpResponse};
     use futures::Future;
 
     select!(links);
@@ -227,10 +270,15 @@ pub mod links {
 
     /// PUT a new link entry
     pub fn put(
-        (path, body): (web::Path<String>, web::Json<PutLink>),
+        request: HttpRequest,
+        path: web::Path<String>,
+        body: web::Json<PutLink>,
         pool: web::Data<Pool>,
+        identity: actix_identity::Identity,
+        token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        parse_id(&path)
+        auth(identity, request, &token_hash)
+            .and_then(move |_| parse_id(&path))
             .and_then(move |id| {
                 web::block(move || queries::links::replace(id, &body.forward, pool))
                     .then(|result| match_replace_result(result))
@@ -244,10 +292,12 @@ pub mod links {
 pub mod texts {
     use crate::{
         queries::{self, SelectQuery},
-        routes::{match_find_error, match_replace_result, parse_id, timestamp_to_last_modified},
+        routes::{
+            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+        },
         Pool,
     };
-    use actix_web::{web, Error, HttpResponse};
+    use actix_web::{web, Error, HttpRequest, HttpResponse};
     use futures::Future;
 
     select!(texts);
@@ -278,10 +328,15 @@ pub mod texts {
 
     /// PUT a new text entry
     pub fn put(
-        (path, body): (web::Path<String>, web::Json<PutText>),
+        request: HttpRequest,
+        path: web::Path<String>,
+        body: web::Json<PutText>,
         pool: web::Data<Pool>,
+        identity: actix_identity::Identity,
+        token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        parse_id(&path)
+        auth(identity, request, &token_hash)
+            .and_then(move |_| parse_id(&path))
             .and_then(move |id| {
                 web::block(move || {
                     queries::texts::replace(id, &body.contents, body.highlight, pool)

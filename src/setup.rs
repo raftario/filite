@@ -49,7 +49,7 @@ pub fn get_token_path() -> PathBuf {
 }
 
 /// Returns the BLAKE2b digest of the input string
-pub fn hash(input: &str) -> Vec<u8> {
+pub fn hash<T: AsRef<[u8]>>(input: T) -> Vec<u8> {
     let mut hasher = Blake2b::new();
     hasher.input(input);
     hasher.result().to_vec()
