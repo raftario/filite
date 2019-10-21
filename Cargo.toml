@@ -3,7 +3,7 @@ name = "filite"
 version = "0.1.0"
 authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
-description = "A simple, light and standalone URL shortener and pastebin"
+description = "A simple, light and standalone pastebin, URL shortener and file-sharing service"
 
 [dependencies]
 actix-files = "0.1.6"
