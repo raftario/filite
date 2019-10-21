@@ -55,14 +55,12 @@ macro_rules! select {
             pool: actix_web::web::Data<Pool>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
             let filters = crate::queries::SelectFilters::from(query.into_inner());
-            actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
-                |result| match result {
+            actix_web::web::block(move || crate::queries::$m::select(filters, pool))
+                .then(|result| match result {
                     Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
-                    Err(_) => Err(actix_web::HttpResponse::InternalServerError()
-                        .finish()
-                        .into()),
-                },
-            )
+                    Err(_) => Err(actix_web::HttpResponse::InternalServerError().finish()),
+                })
+                .from_err()
         }
     };
 }
