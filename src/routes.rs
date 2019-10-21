@@ -123,7 +123,6 @@ macro_rules! delete {
 }
 
 /// GET the config info
-#[cfg(feature = "dev")]
 pub fn get_config(
     request: HttpRequest,
     config: web::Data<Config>,

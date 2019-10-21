@@ -264,6 +264,8 @@ pub fn init() -> Config {
             eprintln!("Can't read token: {}", e);
             process::exit(1);
         });
+        token = token.replace("\r", "");
+        token = token.replace("\n", "");
         let token_hash = hash(&token);
         let token_path = get_token_path();
         fs::write(&token_path, token_hash.as_slice()).unwrap_or_else(|e| {
