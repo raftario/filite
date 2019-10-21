@@ -5,6 +5,47 @@ use crate::setup::Config;
 use actix_web::error::BlockingError;
 use actix_web::{web, HttpResponse, Responder};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use diesel;
+use futures::future::{self, FutureResult};
+use serde::Serialize;
+
+/// Parses an ID
+fn parse_id(id: &str) -> FutureResult<i32, HttpResponse> {
+    match i32::from_str_radix(id, 36) {
+        Ok(id) => future::ok(id),
+        Err(_) => future::err(HttpResponse::BadRequest().finish()),
+    }
+}
+
+/// Match result from REPLACE queries
+#[inline(always)]
+fn match_replace_result<T: Serialize>(
+    result: Result<T, BlockingError<diesel::result::Error>>,
+) -> Result<HttpResponse, HttpResponse> {
+    match result {
+        Ok(x) => Ok(HttpResponse::Created().json(x)),
+        Err(_) => Err(HttpResponse::InternalServerError().finish()),
+    }
+}
+
+/// Handles error from single GET queries using find
+#[inline(always)]
+fn match_find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, HttpResponse> {
+    match error {
+        BlockingError::Error(e) => match e {
+            diesel::result::Error::NotFound => Err(HttpResponse::NotFound().finish()),
+            _ => Err(HttpResponse::InternalServerError().finish()),
+        },
+        BlockingError::Canceled => Err(HttpResponse::InternalServerError().finish()),
+    }
+}
+
+/// Formats a timestamp to the "Last-Modified" header format
+fn timestamp_to_last_modified(timestamp: i32) -> String {
+    let datetime =
+        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp as i64, 0), Utc);
+    datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
+}
 
 /// GET multiple entries
 macro_rules! select {
@@ -26,44 +67,6 @@ macro_rules! select {
     };
 }
 
-/// Parses an ID and errors if it fails
-macro_rules! parse_id {
-    ($s:expr) => {
-        match i32::from_str_radix($s, 36) {
-            Ok(id) => id,
-            Err(_) => {
-                return futures::future::Either::B(future::err(
-                    HttpResponse::BadRequest().finish().into(),
-                ))
-            }
-        };
-    };
-}
-
-/// Match result from REPLACE queries
-macro_rules! put_then {
-    ($f:expr) => {
-        $f.then(|result| match result {
-            Ok(x) => Ok(actix_web::HttpResponse::Created().json(x)),
-            Err(_) => Err(actix_web::HttpResponse::InternalServerError()
-                .finish()
-                .into()),
-        })
-    };
-}
-
-/// Handles error from single GET queries using find
-#[inline(always)]
-fn find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, actix_web::Error> {
-    match error {
-        BlockingError::Error(e) => match e {
-            diesel::result::Error::NotFound => Err(HttpResponse::NotFound().finish().into()),
-            _ => Err(HttpResponse::InternalServerError().finish().into()),
-        },
-        BlockingError::Canceled => Err(HttpResponse::InternalServerError().finish().into()),
-    }
-}
-
 /// DELETE an entry
 macro_rules! delete {
     ($m:ident) => {
@@ -71,24 +74,18 @@ macro_rules! delete {
             path: actix_web::web::Path<String>,
             pool: actix_web::web::Data<Pool>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
-            let id = parse_id!(&path);
-            futures::future::Either::A(
-                actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
-                    |result| match result {
-                        Ok(()) => Ok(actix_web::HttpResponse::NoContent().finish()),
-                        Err(e) => crate::routes::find_error(e),
-                    },
-                ),
-            )
+            crate::routes::parse_id(&path)
+                .and_then(move |id| {
+                    actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
+                        |result| match result {
+                            Ok(()) => Ok(actix_web::HttpResponse::NoContent().finish()),
+                            Err(e) => crate::routes::match_find_error(e),
+                        },
+                    )
+                })
+                .from_err()
         }
     };
-}
-
-/// Formats a timestamp to the "Last-Modified" header format
-fn timestamp_to_last_modified(timestamp: i32) -> String {
-    let datetime =
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp as i64, 0), Utc);
-    datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
 /// GET the config info
@@ -98,7 +95,7 @@ pub fn get_config(config: web::Data<Config>) -> impl Responder {
 
 pub mod files {
     use crate::queries::{self, SelectQuery};
-    use crate::routes::find_error;
+    use crate::routes::{match_find_error, parse_id};
     use crate::setup::Config;
     use crate::Pool;
 
@@ -106,7 +103,6 @@ pub mod files {
     use actix_web::error::BlockingError;
     use actix_web::{http, web, Error, HttpResponse};
     use chrono::Utc;
-    use futures::future::{self, Either};
     use futures::Future;
     use std::fs;
     use std::path::PathBuf;
@@ -119,21 +115,23 @@ pub mod files {
         pool: web::Data<Pool>,
         config: web::Data<Config>,
     ) -> impl Future<Item = NamedFile, Error = Error> {
-        let id = parse_id!(&path);
-        let files_dir = config.files_dir.clone();
-        Either::A(
-            web::block(move || queries::files::find(id, pool)).then(|result| match result {
-                Ok(file) => {
-                    let mut path = files_dir;
-                    path.push(file.filepath);
-                    match NamedFile::open(&path) {
-                        Ok(nf) => Ok(nf),
-                        Err(_) => Err(HttpResponse::NotFound().finish().into()),
-                    }
-                }
-                Err(e) => find_error(e),
-            }),
-        )
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || queries::files::find(id, pool)).then(
+                    move |result| match result {
+                        Ok(file) => {
+                            let mut path = config.files_dir.clone();
+                            path.push(file.filepath);
+                            match NamedFile::open(&path) {
+                                Ok(nf) => Ok(nf),
+                                Err(_) => Err(HttpResponse::NotFound().finish()),
+                            }
+                        }
+                        Err(e) => match_find_error(e),
+                    },
+                )
+            })
+            .from_err()
     }
 
     /// Request body when PUTting files
@@ -149,9 +147,9 @@ pub mod files {
         config: web::Data<Config>,
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let id = parse_id!(&path);
-        Either::A(
-            web::block(move || {
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || {
                 let mut path = config.files_dir.clone();
                 let mut relative_path = PathBuf::new();
                 if fs::create_dir_all(&path).is_err() {
@@ -184,13 +182,14 @@ pub mod files {
             .then(|result| match result {
                 Ok(file) => Ok(HttpResponse::Created().json(file)),
                 Err(e) => match e {
-                    BlockingError::Error(sc) => Err(HttpResponse::new(sc).into()),
+                    BlockingError::Error(sc) => Err(HttpResponse::new(sc)),
                     BlockingError::Canceled => {
-                        Err(HttpResponse::InternalServerError().finish().into())
+                        Err(HttpResponse::InternalServerError().finish())
                     }
                 },
-            }),
-        )
+            })
+            })
+            .from_err()
     }
 
     delete!(files);
@@ -198,11 +197,12 @@ pub mod files {
 
 pub mod links {
     use crate::queries::{self, SelectQuery};
-    use crate::routes::{find_error, timestamp_to_last_modified};
+    use crate::routes::{
+        match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+    };
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
-    use futures::future::{self, Either};
     use futures::Future;
 
     select!(links);
@@ -212,16 +212,17 @@ pub mod links {
         path: web::Path<String>,
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let id = parse_id!(&path);
-        Either::A(
-            web::block(move || queries::links::find(id, pool)).then(|result| match result {
-                Ok(link) => Ok(HttpResponse::Found()
-                    .header("Location", link.forward)
-                    .header("Last-Modified", timestamp_to_last_modified(link.created))
-                    .finish()),
-                Err(e) => find_error(e),
-            }),
-        )
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || queries::links::find(id, pool)).then(|result| match result {
+                    Ok(link) => Ok(HttpResponse::Found()
+                        .header("Location", link.forward)
+                        .header("Last-Modified", timestamp_to_last_modified(link.created))
+                        .finish()),
+                    Err(e) => match_find_error(e),
+                })
+            })
+            .from_err()
     }
 
     /// Request body when PUTting links
@@ -235,12 +236,12 @@ pub mod links {
         (path, body): (web::Path<String>, web::Json<PutLink>),
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let id = parse_id!(&path);
-        Either::A(put_then!(web::block(move || queries::links::replace(
-            id,
-            &body.forward,
-            pool
-        ))))
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || queries::links::replace(id, &body.forward, pool))
+                    .then(|result| match_replace_result(result))
+            })
+            .from_err()
     }
 
     delete!(links);
@@ -248,11 +249,12 @@ pub mod links {
 
 pub mod texts {
     use crate::queries::{self, SelectQuery};
-    use crate::routes::{find_error, timestamp_to_last_modified};
+    use crate::routes::{
+        match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+    };
     use crate::Pool;
 
     use actix_web::{web, Error, HttpResponse};
-    use futures::future::{self, Either};
     use futures::Future;
 
     select!(texts);
@@ -262,15 +264,16 @@ pub mod texts {
         path: web::Path<String>,
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let id = parse_id!(&path);
-        Either::A(
-            web::block(move || queries::texts::find(id, pool)).then(|result| match result {
-                Ok(text) => Ok(HttpResponse::Ok()
-                    .header("Last-Modified", timestamp_to_last_modified(text.created))
-                    .body(text.contents)),
-                Err(e) => find_error(e),
-            }),
-        )
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || queries::texts::find(id, pool)).then(|result| match result {
+                    Ok(text) => Ok(HttpResponse::Ok()
+                        .header("Last-Modified", timestamp_to_last_modified(text.created))
+                        .body(text.contents)),
+                    Err(e) => match_find_error(e),
+                })
+            })
+            .from_err()
     }
 
     /// Request body when PUTting texts
@@ -285,13 +288,14 @@ pub mod texts {
         (path, body): (web::Path<String>, web::Json<PutText>),
         pool: web::Data<Pool>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let id = parse_id!(&path);
-        Either::A(put_then!(web::block(move || queries::texts::replace(
-            id,
-            &body.contents,
-            body.highlight,
-            pool
-        ))))
+        parse_id(&path)
+            .and_then(move |id| {
+                web::block(move || {
+                    queries::texts::replace(id, &body.contents, body.highlight, pool)
+                })
+                .then(|result| match_replace_result(result))
+            })
+            .from_err()
     }
 
     delete!(texts);
