@@ -50,6 +50,7 @@ macro_rules! put_then {
 }
 
 /// Handles error from single GET queries using find
+#[inline(always)]
 fn find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, actix_web::Error> {
     match error {
         BlockingError::Error(e) => match e {

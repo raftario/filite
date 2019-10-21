@@ -14,6 +14,11 @@ use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use std::process;
 
+#[cfg(feature = "dev")]
+use dotenv;
+#[cfg(not(feature = "dev"))]
+use std::fs;
+
 pub mod models;
 pub mod queries;
 pub mod routes;
@@ -32,7 +37,6 @@ fn main() {
         {
             Config::debug()
         }
-
         #[cfg(not(feature = "dev"))]
         {
             setup::init()
@@ -47,11 +51,29 @@ fn main() {
         process::exit(1);
     });
 
+    let token = {
+        #[cfg(feature = "dev")]
+        {
+            dotenv::dotenv().ok();
+            let token = get_env!("TOKEN");
+            setup::hash(&token)
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            let token_path = setup::get_token_path();
+            fs::read(&token_path).unwrap_or_else(|e| {
+                eprintln!("Can't read bearer token hash from disk: {}.", e);
+                process::exit(1);
+            })
+        }
+    };
+
     let port = config.port;
     let max_filesize = (config.max_filesize as f64 * 1.37) as usize;
 
     HttpServer::new(move || {
         App::new()
+            .data(token.clone())
             .data(config.clone())
             .data(pool.clone())
             .wrap(setup::logger_middleware())

@@ -3,13 +3,12 @@
 use crate::Pool;
 
 use actix_web::middleware::Logger;
+use blake2::{Blake2b, Digest};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use std::env;
 use std::path::PathBuf;
 
-#[cfg(not(feature = "dev"))]
-use blake2::{Blake2b, Digest};
 #[cfg(not(feature = "dev"))]
 use dirs;
 #[cfg(feature = "dev")]
@@ -41,11 +40,27 @@ fn get_config_path() -> PathBuf {
     path
 }
 
+/// Returns a path to the bearer token hash
+#[cfg(not(feature = "dev"))]
+pub fn get_token_path() -> PathBuf {
+    let mut path = get_data_dir();
+    path.push("token");
+    path
+}
+
+/// Returns the BLAKE2b digest of the input string
+pub fn hash(input: &str) -> Vec<u8> {
+    let mut hasher = Blake2b::new();
+    hasher.input(input);
+    hasher.result().to_vec()
+}
+
 /// Returns an environment variable and panic if it isn't found
 #[cfg(feature = "dev")]
+#[macro_export]
 macro_rules! get_env {
     ($k:literal) => {
-        env::var($k).expect(&format!("Can't find {} environment variable.", $k));
+        std::env::var($k).expect(&format!("Can't find {} environment variable.", $k));
     };
 }
 
@@ -249,11 +264,9 @@ pub fn init() -> Config {
             eprintln!("Can't read token: {}", e);
             process::exit(1);
         });
-        let mut hasher = Blake2b::new();
-        hasher.input(&token);
-        let mut token_path = data_dir.clone();
-        token_path.push("token");
-        fs::write(&token_path, hasher.result().as_slice()).unwrap_or_else(|e| {
+        let token_hash = hash(&token);
+        let token_path = get_token_path();
+        fs::write(&token_path, token_hash.as_slice()).unwrap_or_else(|e| {
             eprintln!("Can't write token: {}", e);
             process::exit(1);
         });
