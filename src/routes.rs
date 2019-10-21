@@ -28,15 +28,23 @@ fn auth(
         false => match request.headers().get("Authorization") {
             Some(header) => match header.to_str() {
                 Ok(header) => {
-                    let token: Vec<u8> = header.bytes().skip(7).collect();
+                    let token = header.replace("Bearer ", "");
                     match setup::hash(&token).as_slice() == token_hash {
                         true => future::ok(()),
-                        false => future::err(HttpResponse::Unauthorized().finish()),
+                        false => future::err(
+                            HttpResponse::Unauthorized()
+                                .header("WWW-Authenticate", "Bearer")
+                                .finish(),
+                        ),
                     }
                 }
                 Err(_) => future::err(HttpResponse::BadRequest().finish()),
             },
-            None => future::err(HttpResponse::Unauthorized().finish()),
+            None => future::err(
+                HttpResponse::Unauthorized()
+                    .header("WWW-Authenticate", "Bearer")
+                    .finish(),
+            ),
         },
     }
 }
