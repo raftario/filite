@@ -143,9 +143,7 @@ pub fn login(
     token_hash: web::Data<Vec<u8>>,
 ) -> impl Responder {
     if identity.identity().is_some() {
-        return HttpResponse::Found()
-            .header("Location", request.uri().to_string().replace("/login", ""))
-            .finish();
+        return HttpResponse::Found().header("Location", "..").finish();
     }
 
     let header = match request.headers().get("Authorization") {
@@ -176,9 +174,7 @@ pub fn login(
         true => match String::from_utf8(user.to_vec()) {
             Ok(u) => {
                 identity.remember(u);
-                HttpResponse::Found()
-                    .header("Location", request.uri().to_string().replace("/login", ""))
-                    .finish()
+                HttpResponse::Found().header("Location", "..").finish()
             }
             Err(_) => HttpResponse::BadRequest().finish(),
         },
@@ -189,13 +185,11 @@ pub fn login(
 }
 
 /// Logout route
-pub fn logout(request: HttpRequest, identity: Identity) -> impl Responder {
+pub fn logout(identity: Identity) -> impl Responder {
     match identity.identity().is_some() {
         true => {
             identity.forget();
-            HttpResponse::Found()
-                .header("Location", request.uri().to_string().replace("/login", ""))
-                .finish()
+            HttpResponse::Found().header("Location", "..").finish()
         }
         false => HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Bearer realm=\"filite\"")

@@ -6,6 +6,7 @@ extern crate serde;
 #[cfg_attr(not(feature = "dev"), macro_use)]
 extern crate diesel_migrations;
 
+use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, FromRequest, HttpServer};
 use diesel::{
     r2d2::{self, ConnectionManager},
@@ -77,6 +78,11 @@ fn main() {
             .data(pool.clone())
             .data(config.clone())
             .data(token_hash.clone())
+            .wrap(IdentityService::new(
+                CookieIdentityPolicy::new(&[0; 32])
+                    .name("filite-auth-cookie")
+                    .secure(false),
+            ))
             .wrap(setup::logger_middleware())
             .route("/login", web::get().to(routes::login))
             .route("/logout", web::get().to(routes::logout))
