@@ -6,6 +6,7 @@ use actix_web::{error::BlockingError, web, HttpRequest, HttpResponse, Responder}
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use futures::future::{self, FutureResult};
+use futures::Future;
 use serde::Serialize;
 
 /// Parses an ID
@@ -121,8 +122,17 @@ macro_rules! delete {
 }
 
 /// GET the config info
-pub fn get_config(config: web::Data<Config>) -> impl Responder {
-    HttpResponse::Ok().json(config.get_ref())
+#[cfg(feature = "dev")]
+pub fn get_config(
+    request: HttpRequest,
+    config: web::Data<Config>,
+    identity: actix_identity::Identity,
+    token_hash: actix_web::web::Data<Vec<u8>>,
+) -> impl Responder {
+    match auth(identity, request, &token_hash).wait() {
+        Ok(_) => HttpResponse::Ok().json(config.get_ref()),
+        Err(response) => response,
+    }
 }
 
 pub mod files {
@@ -177,8 +187,8 @@ pub mod files {
         request: HttpRequest,
         path: web::Path<String>,
         body: web::Json<PutFile>,
-        config: web::Data<Config>,
         pool: web::Data<Pool>,
+        config: web::Data<Config>,
         identity: actix_identity::Identity,
         token_hash: actix_web::web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {

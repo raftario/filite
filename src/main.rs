@@ -75,8 +75,8 @@ fn main() {
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .data(token_hash.clone())
             .data(config.clone())
+            .data(token_hash.clone())
             .wrap(setup::logger_middleware())
             .service(web::resource("/config").route(web::get().to(routes::get_config)))
             .service(web::resource("/f").route(web::get().to_async(routes::files::gets)))
