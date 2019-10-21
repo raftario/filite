@@ -13,6 +13,7 @@ blake2 = "0.8.1"
 chrono = "0.4.9"
 diesel_migrations = "1.4.0"
 dirs = "2.0.2"
+dotenv = { version = "0.14.1", optional = true }
 env_logger = "0.7.0"
 futures = "0.1.29"
 num_cpus = "1.10.1"
@@ -27,5 +28,6 @@ features = ["bundled"]
 version = "1.0.101"
 features = ["derive"]
 
-[target.'cfg(debug_assertions)'.dependencies]
-dotenv = "0.14.1"
+[features]
+default = []
+dev = ["dotenv"]

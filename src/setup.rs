@@ -8,25 +8,25 @@ use diesel::sqlite::SqliteConnection;
 use std::env;
 use std::path::PathBuf;
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use blake2::{Blake2b, Digest};
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use dirs;
-#[cfg(debug_assertions)]
+#[cfg(feature = "dev")]
 use dotenv;
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use std::fs;
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use std::io::{self, BufRead};
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use std::process;
-#[cfg(debug_assertions)]
+#[cfg(feature = "dev")]
 use std::str::FromStr;
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 use toml;
 
 /// Returns a path to the directory storing application data
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 pub fn get_data_dir() -> PathBuf {
     let mut dir = dirs::home_dir().expect("Can't find home directory.");
     dir.push(".filite");
@@ -34,7 +34,7 @@ pub fn get_data_dir() -> PathBuf {
 }
 
 /// Returns a path to the configuration file
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 fn get_config_path() -> PathBuf {
     let mut path = get_data_dir();
     path.push("config.toml");
@@ -42,7 +42,7 @@ fn get_config_path() -> PathBuf {
 }
 
 /// Returns an environment variable and panic if it isn't found
-#[cfg(debug_assertions)]
+#[cfg(feature = "dev")]
 macro_rules! get_env {
     ($k:literal) => {
         env::var($k).expect(&format!("Can't find {} environment variable.", $k));
@@ -50,7 +50,7 @@ macro_rules! get_env {
 }
 
 /// Returns a parsed environment variable and panic if it isn't found or is not parsable
-#[cfg(debug_assertions)]
+#[cfg(feature = "dev")]
 macro_rules! parse_env {
     ($k:literal) => {
         get_env!($k).parse().expect(&format!("Invalid {}.", $k))
@@ -59,7 +59,7 @@ macro_rules! parse_env {
 
 /// Application configuration
 #[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(not(debug_assertions), serde(default))]
+#[cfg_attr(not(feature = "dev"), serde(default))]
 pub struct Config {
     /// Port to listen on
     pub port: u16,
@@ -73,7 +73,7 @@ pub struct Config {
     pub max_filesize: usize,
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 impl Default for Config {
     fn default() -> Self {
         let port = 8080;
@@ -104,7 +104,7 @@ impl Default for Config {
 
 impl Config {
     /// Deserialize the config file
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature = "dev"))]
     pub fn read_file() -> Result<Self, &'static str> {
         let path = get_config_path();
         let contents = if let Ok(contents) = fs::read_to_string(&path) {
@@ -146,7 +146,7 @@ impl Config {
     }
 
     /// Serialize the config file
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature = "dev"))]
     pub fn write_file(&self) -> Result<(), &'static str> {
         let path = get_config_path();
         let contents = toml::to_string(&self).expect("Can't serialize config.");
@@ -157,7 +157,7 @@ impl Config {
     }
 
     /// Creates a config from environment variables
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "dev")]
     pub fn debug() -> Self {
         dotenv::dotenv().ok();
 
@@ -202,9 +202,9 @@ pub fn create_pool(url: &str, size: u32) -> Pool {
 
 /// Initializes the logger
 pub fn init_logger() {
-    if cfg!(debug_assertions) && env::var_os("RUST_LOG").is_none() {
+    if cfg!(feature = "dev") && env::var_os("RUST_LOG").is_none() {
         env::set_var("RUST_LOG", "actix_web=debug");
-    } else if !cfg!(debug_assertions) {
+    } else if !cfg!(feature = "dev") {
         env::set_var("RUST_LOG", "actix_web=info");
     }
     env_logger::init();
@@ -212,7 +212,7 @@ pub fn init_logger() {
 
 /// Returns the logger middleware
 pub fn logger_middleware() -> Logger {
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "dev")]
     {
         dotenv::dotenv().ok();
         if let Ok(format) = env::var("LOG_FORMAT") {
@@ -222,14 +222,14 @@ pub fn logger_middleware() -> Logger {
         }
     }
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature = "dev"))]
     {
         Logger::default()
     }
 }
 
 /// Performs the initial setup
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "dev"))]
 pub fn init() -> Config {
     let data_dir = get_data_dir();
     if !data_dir.exists() {
