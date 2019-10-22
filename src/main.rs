@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate diesel;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate serde;
 
 #[cfg_attr(not(feature = "dev"), macro_use)]
@@ -84,6 +86,7 @@ fn main() {
                     .secure(false),
             ))
             .wrap(setup::logger_middleware())
+            .route("/", web::get().to(routes::index))
             .route("/login", web::get().to(routes::login))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))

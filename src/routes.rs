@@ -8,6 +8,11 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use serde::Serialize;
 
+#[cfg(feature = "dev")]
+use crate::get_env;
+#[cfg(feature = "dev")]
+use std::{fs, path::PathBuf};
+
 /// Parses an ID
 fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     match i32::from_str_radix(id, 36) {
@@ -122,12 +127,71 @@ macro_rules! delete {
     };
 }
 
+#[cfg(feature = "dev")]
+lazy_static! {
+    static ref RESOURCES_DIR: PathBuf = {
+        let mut ressources_dir = PathBuf::new();
+        ressources_dir.push(get_env!("CARGO_MANIFEST_DIR"));
+        ressources_dir.push("resources");
+        ressources_dir.push("web");
+        ressources_dir
+    };
+    static ref HTML_PATH: PathBuf = {
+        let mut html_path = RESOURCES_DIR.clone();
+        html_path.push("index.html");
+        html_path
+    };
+    static ref JS_PATH: PathBuf = {
+        let mut js_path = RESOURCES_DIR.clone();
+        js_path.push("script.js");
+        js_path
+    };
+    static ref CSS_PATH: PathBuf = {
+        let mut css_path = RESOURCES_DIR.clone();
+        css_path.push("style.css");
+        css_path
+    };
+}
+
+#[cfg(not(feature = "dev"))]
+lazy_static! {
+    static ref INDEX_CONTENTS: String = {
+        let html = include_str!("../resources/web/index.html");
+        let js = include_str!("../resources/web/script.js");
+        let css = include_str!("../resources/web/style.css");
+
+        html.replace("{{ js }}", js).replace("{{ css }}", css)
+    };
+}
+
+/// Index page letting users upload via a UI
+pub fn index(_identity: Identity) -> impl Responder {
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            let html = fs::read_to_string(&*HTML_PATH).expect("Can't read index.html");
+            let js = fs::read_to_string(&*JS_PATH).expect("Can't read script.js");
+            let css = fs::read_to_string(&*CSS_PATH).expect("Can't read style.css");
+
+            html.replace("{{ js }}", &js).replace("{{ css }}", &css)
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            INDEX_CONTENTS.clone()
+        }
+    };
+
+    HttpResponse::Ok()
+        .header("Content-Type", "text/html")
+        .body(contents)
+}
+
 /// GET the config info
 pub fn get_config(
     request: HttpRequest,
     config: web::Data<Config>,
-    identity: actix_identity::Identity,
-    token_hash: actix_web::web::Data<Vec<u8>>,
+    identity: Identity,
+    token_hash: web::Data<Vec<u8>>,
 ) -> impl Responder {
     match auth(identity, request, &token_hash) {
         Ok(_) => HttpResponse::Ok().json(config.get_ref()),
