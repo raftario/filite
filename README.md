@@ -10,6 +10,8 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 * Standalone. No external dependencies required, everything that is needed is packed into the binary.
 * Light and fast. The Rust web framework [Actix](https://actix.rs) is used under the hood, providing great speed with a minimal footprint.
 
+![Screenshot of filite UI](screenshot.png)
+
 ## Installation
 
 1. Get the binary either from the [releases page](https://github.com/raftario/filite/releases) or [using Cargo](https://crates.io/crates/filite)
