@@ -158,7 +158,6 @@ lazy_static! {
         let mut ressources_dir = PathBuf::new();
         ressources_dir.push(get_env!("CARGO_MANIFEST_DIR"));
         ressources_dir.push("resources");
-        ressources_dir.push("web");
         ressources_dir
     };
     static ref HTML_PATH: PathBuf = {
@@ -181,9 +180,9 @@ lazy_static! {
 #[cfg(not(feature = "dev"))]
 lazy_static! {
     static ref INDEX_CONTENTS: String = {
-        let html = include_str!("../resources/web/index.html");
-        let js = include_str!("../resources/web/script.js");
-        let css = include_str!("../resources/web/style.css");
+        let html = include_str!("../resources/index.html");
+        let js = include_str!("../resources/script.js");
+        let css = include_str!("../resources/style.css");
 
         html.replace("{{ js }}", js).replace("{{ css }}", css)
     };
