@@ -1,11 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+            {{ css }}
+        </style>
         <title>filite</title>
     </head>
     <body>
-        Hello world!
+        <nav>
+            <div id="files-tab" role="tab"><span>Files</span></div>
+            <div id="links-tab" class="active" role="tab">
+                <span>Links</span>
+            </div>
+            <div id="texts-tab" role="tab"><span>Texts</span></div>
+        </nav>
+        <main>
+            <div id="files-form">
+                <label for="files-url">URL</label>
+                <input
+                    id="files-url"
+                    class="mb1"
+                    type="text"
+                    placeholder="a1b2c3"
+                    required
+                />
+                <label for="files-file">File</label>
+                <input id="files-file" type="file" hidden />
+                <div class="mb2">
+                    <button id="files-browse">Browse</button
+                    ><input id="files-value" type="text" required />
+                </div>
+                <button id="files-submit" disabled>Submit</button>
+            </div>
+            <div id="links-form" class="active">
+                <label for="links-url">URL</label>
+                <input
+                    id="links-url"
+                    class="mb1"
+                    type="text"
+                    placeholder="a1b2c3"
+                    required
+                />
+                <label for="links-forward">Forward</label>
+                <input
+                    id="links-forward"
+                    class="mb2"
+                    type="url"
+                    placeholder="http://example.com/"
+                    required
+                />
+                <button id="links-submit" disabled>Submit</button>
+            </div>
+            <div id="texts-form">
+                <label for="texts-url">URL</label>
+                <input
+                    id="texts-url"
+                    class="mb1"
+                    type="text"
+                    placeholder="a1b2c3"
+                    required
+                />
+                <label for="texts-contents">Contents</label>
+                <textarea
+                    id="texts-contents"
+                    class="mb2"
+                    placeholder="Hello, World!"
+                    required
+                ></textarea>
+                <button id="texts-submit" disabled>Submit</button>
+            </div>
+        </main>
+        <script>
+            {{ js }}
+        </script>
     </body>
 </html>

@@ -1,0 +1,166 @@
+html,
+body {
+    margin: 0px;
+    padding: 0px;
+    width: 100vw;
+    height: 100vh;
+}
+
+html {
+    font-family: sans-serif;
+    font-size: 200%;
+}
+
+body {
+    display: grid;
+    grid-template:
+        [r1s] "nav" 2rem [r1e]
+        [r2s] "main" auto [r2e]
+        / auto;
+    background-color: #002b36;
+    color: #839496;
+}
+
+::placeholder {
+    color: #586e75;
+}
+
+nav {
+    display: flex;
+    justify-content: space-evenly;
+    grid-area: nav;
+    background-color: #073642;
+}
+
+nav div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    font-size: 1rem;
+    border-bottom: 0.0625rem solid #586e75;
+}
+
+nav div:hover {
+    background-color: #002b36;
+    color: #93a1a1;
+    cursor: pointer;
+}
+
+nav div.active {
+    background-color: #002b36;
+    color: #93a1a1;
+    border-top: 0.0625rem solid #586e75;
+    border-right: 0.0625rem solid #586e75;
+    border-left: 0.0625rem solid #586e75;
+    border-bottom: none;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    grid-area: main;
+}
+
+main div {
+    display: none;
+}
+
+main div.active {
+    display: block;
+}
+
+main div label {
+    display: block;
+    margin-bottom: 0.5rem;
+    padding-left: 1rem;
+    font-size: 1rem;
+}
+
+main div input[type="text"],
+main div input[type="url"] {
+    display: block;
+    padding: 0.5rem 1rem;
+    width: calc(75vw - 2rem);
+    background-color: #073642;
+    color: #839496;
+    font-size: 1rem;
+    border: none;
+}
+
+main div textarea {
+    display: block;
+    padding: 0.5rem 1rem;
+    width: calc(75vw - 2rem);
+    height: 25vh;
+    background-color: #073642;
+    color: #839496;
+    font-family: monospace;
+    font-size: 0.5rem;
+    border: none;
+}
+
+main div input[type="text"]:invalid,
+main div input[type="url"]:invalid,
+main div textarea:invalid {
+    border: 0.0625rem solid #dc322f;
+}
+
+main div button {
+    display: block;
+    padding: 0.5rem 1rem;
+    width: 75vw;
+    background-color: #073642;
+    color: #839496;
+    font-size: 1rem;
+    border: 0.0625rem solid #586e75;
+}
+
+main div button:hover,
+main div button:focus {
+    background-color: #002b36;
+    color: #93a1a1;
+    cursor: pointer;
+}
+
+main div button:disabled {
+    background-color: #073642;
+    color: #586e75;
+    border: none;
+    cursor: default;
+}
+
+main div div {
+    display: flex;
+    width: 75vw;
+}
+
+main div div button {
+    width: auto;
+}
+
+main div div input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    background-color: #073642;
+}
+
+.mb1 {
+    margin-bottom: 2rem;
+}
+
+.mb2 {
+    margin-bottom: 4rem;
+}
+
+@media screen and (max-height: 720px) {
+    .mb1 {
+        margin-bottom: 1rem;
+    }
+
+    .mb2 {
+        margin-bottom: 2rem;
+    }
+}
