@@ -31,6 +31,10 @@ const inputs = {
     ],
 };
 
+const randomUrl = () => {
+    return Math.floor(Math.random() * 2147483647).toString(36);
+}
+
 for (const group in tabs) {
     tabs[group][0].onclick = () => {
         const active = document.querySelectorAll(".active");
@@ -63,6 +67,13 @@ for (const group in inputs) {
             );
         } else {
             urlInput.setCustomValidity("");
+        }
+    });
+    urlInput.addEventListener("keyup", (e) => {
+        if (e.code === "Space") {
+            urlInput.value = randomUrl();
+            checkValidity();
+            e.preventDefault();
         }
     });
 
