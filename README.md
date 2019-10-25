@@ -3,6 +3,7 @@
 A simple, light and standalone pastebin, URL shortener and file-sharing service that hosts **fi**les, redirects **li**nks and stores **te**xts.
 
 [![GitHub Actions](https://github.com/raftario/filite/workflows/Build/badge.svg)](https://github.com/raftario/filite/actions?workflowID=Build)
+[![Crates.io](https://img.shields.io/crates/v/filite.svg)](https://crates.io/crates/filite)
 
 ## Features
 
