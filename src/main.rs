@@ -50,10 +50,12 @@ fn main() {
 
     let pool = setup::create_pool(&config.database_url, config.pool_size);
     #[cfg(not(feature = "dev"))]
-    embedded_migrations::run(&pool.get().unwrap()).unwrap_or_else(|e| {
-        eprintln!("Can't prepare database: {}.", e);
-        process::exit(1);
-    });
+    {
+        embedded_migrations::run(&pool.get().unwrap()).unwrap_or_else(|e| {
+            eprintln!("Can't prepare database: {}.", e);
+            process::exit(1);
+        });
+    }
 
     let password_hash = {
         #[cfg(feature = "dev")]

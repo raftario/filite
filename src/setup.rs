@@ -99,7 +99,13 @@ impl Default for Config {
                 .expect("Can't convert database path to string")
                 .to_owned()
         };
-        let pool_size = num_cpus::get() as u32 / 2;
+        let pool_size = {
+            let n = num_cpus::get() as u32 / 2;
+            match n < 1 {
+                true => 1,
+                false => n,
+            }
+        };
         let files_dir = {
             let mut path = get_data_dir();
             path.push("files");
