@@ -42,9 +42,9 @@ fn get_config_path() -> PathBuf {
 
 /// Returns a path to the bearer token hash
 #[cfg(not(feature = "dev"))]
-pub fn get_token_path() -> PathBuf {
+pub fn get_password_path() -> PathBuf {
     let mut path = get_data_dir();
-    path.push("token");
+    path.push("passwd");
     path
 }
 
@@ -258,18 +258,18 @@ pub fn init() -> Config {
 
         let stdin = io::stdin();
         let mut stdin = stdin.lock();
-        eprintln!("Enter the login token to use:");
-        let mut token = String::new();
-        stdin.read_line(&mut token).unwrap_or_else(|e| {
-            eprintln!("Can't read token: {}", e);
+        eprintln!("Enter the password to use:");
+        let mut password = String::new();
+        stdin.read_line(&mut password).unwrap_or_else(|e| {
+            eprintln!("Can't read password: {}", e);
             process::exit(1);
         });
-        token = token.replace("\r", "");
-        token = token.replace("\n", "");
-        let token_hash = hash(&token);
-        let token_path = get_token_path();
-        fs::write(&token_path, token_hash.as_slice()).unwrap_or_else(|e| {
-            eprintln!("Can't write token: {}", e);
+        password = password.replace("\r", "");
+        password = password.replace("\n", "");
+        let password_hash = hash(&password);
+        let password_path = get_password_path();
+        fs::write(&password_path, password_hash.as_slice()).unwrap_or_else(|e| {
+            eprintln!("Can't write password: {}", e);
             process::exit(1);
         });
 

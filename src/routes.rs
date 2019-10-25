@@ -22,7 +22,11 @@ fn parse_id(id: &str) -> Result<i32, HttpResponse> {
 }
 
 /// Checks for authentication
-fn auth(identity: Identity, request: HttpRequest, token_hash: &[u8]) -> Result<(), HttpResponse> {
+fn auth(
+    identity: Identity,
+    request: HttpRequest,
+    password_hash: &[u8],
+) -> Result<(), HttpResponse> {
     if identity.identity().is_some() {
         return Ok(());
     }
@@ -38,8 +42,8 @@ fn auth(identity: Identity, request: HttpRequest, token_hash: &[u8]) -> Result<(
                 .finish())
         }
     };
-    let token = header.replace("Bearer ", "");
-    match setup::hash(&token).as_slice() == token_hash {
+    let password = header.replace("Bearer ", "");
+    match setup::hash(&password).as_slice() == password_hash {
         true => Ok(()),
         false => Err(HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Bearer realm=\"filite\"")
@@ -85,10 +89,10 @@ macro_rules! select {
             query: actix_web::web::Query<SelectQuery>,
             pool: actix_web::web::Data<Pool>,
             identity: actix_identity::Identity,
-            token_hash: actix_web::web::Data<Vec<u8>>,
+            password_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
             let filters = crate::queries::SelectFilters::from(query.into_inner());
-            futures::future::result(crate::routes::auth(identity, request, &token_hash))
+            futures::future::result(crate::routes::auth(identity, request, &password_hash))
                 .and_then(move |_| {
                     actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
                         |result| match result {
@@ -110,9 +114,9 @@ macro_rules! delete {
             path: actix_web::web::Path<String>,
             pool: actix_web::web::Data<Pool>,
             identity: actix_identity::Identity,
-            token_hash: actix_web::web::Data<Vec<u8>>,
+            password_hash: actix_web::web::Data<Vec<u8>>,
         ) -> impl futures::Future<Item = actix_web::HttpResponse, Error = actix_web::Error> {
-            futures::future::result(crate::routes::auth(identity, request, &token_hash))
+            futures::future::result(crate::routes::auth(identity, request, &password_hash))
                 .and_then(move |_| futures::future::result(crate::routes::parse_id(&path)))
                 .and_then(move |id| {
                     actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
@@ -191,9 +195,9 @@ pub fn get_config(
     request: HttpRequest,
     config: web::Data<Config>,
     identity: Identity,
-    token_hash: web::Data<Vec<u8>>,
+    password_hash: web::Data<Vec<u8>>,
 ) -> impl Responder {
-    match auth(identity, request, &token_hash) {
+    match auth(identity, request, &password_hash) {
         Ok(_) => HttpResponse::Ok().json(config.get_ref()),
         Err(response) => response,
     }
@@ -203,7 +207,7 @@ pub fn get_config(
 pub fn login(
     request: HttpRequest,
     identity: Identity,
-    token_hash: web::Data<Vec<u8>>,
+    password_hash: web::Data<Vec<u8>>,
 ) -> impl Responder {
     if identity.identity().is_some() {
         return HttpResponse::Found().header("Location", "..").finish();
@@ -221,7 +225,7 @@ pub fn login(
         }
     };
     let connection_string = header.replace("Basic ", "");
-    let (user, token) = match base64::decode(&connection_string) {
+    let (user, password) = match base64::decode(&connection_string) {
         Ok(c) => {
             let credentials: Vec<Vec<u8>> =
                 c.splitn(2, |b| b == &b':').map(|s| s.to_vec()).collect();
@@ -233,7 +237,7 @@ pub fn login(
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
 
-    match setup::hash(token).as_slice() == token_hash.as_slice() {
+    match setup::hash(password).as_slice() == password_hash.as_slice() {
         true => match String::from_utf8(user.to_vec()) {
             Ok(u) => {
                 identity.remember(u);
@@ -316,9 +320,9 @@ pub mod files {
         pool: web::Data<Pool>,
         config: web::Data<Config>,
         identity: Identity,
-        token_hash: web::Data<Vec<u8>>,
+        password_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        future::result(auth(identity, request, &token_hash))
+        future::result(auth(identity, request, &password_hash))
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || {
@@ -412,9 +416,9 @@ pub mod links {
         body: web::Json<PutLink>,
         pool: web::Data<Pool>,
         identity: Identity,
-        token_hash: web::Data<Vec<u8>>,
+        password_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        future::result(auth(identity, request, &token_hash))
+        future::result(auth(identity, request, &password_hash))
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || queries::links::replace(id, &body.forward, pool))
@@ -470,9 +474,9 @@ pub mod texts {
         body: web::Json<PutText>,
         pool: web::Data<Pool>,
         identity: Identity,
-        token_hash: web::Data<Vec<u8>>,
+        password_hash: web::Data<Vec<u8>>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        future::result(auth(identity, request, &token_hash))
+        future::result(auth(identity, request, &password_hash))
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || queries::texts::replace(id, &body.contents, pool))

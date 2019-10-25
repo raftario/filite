@@ -55,18 +55,18 @@ fn main() {
         process::exit(1);
     });
 
-    let token_hash = {
+    let password_hash = {
         #[cfg(feature = "dev")]
         {
             dotenv::dotenv().ok();
-            let token = get_env!("TOKEN");
-            setup::hash(&token)
+            let password = get_env!("PASSWD");
+            setup::hash(&password)
         }
         #[cfg(not(feature = "dev"))]
         {
-            let token_path = setup::get_token_path();
-            fs::read(&token_path).unwrap_or_else(|e| {
-                eprintln!("Can't read bearer token hash from disk: {}.", e);
+            let password_path = setup::get_password_path();
+            fs::read(&password_path).unwrap_or_else(|e| {
+                eprintln!("Can't read password hash from disk: {}.", e);
                 process::exit(1);
             })
         }
@@ -79,7 +79,7 @@ fn main() {
         App::new()
             .data(pool.clone())
             .data(config.clone())
-            .data(token_hash.clone())
+            .data(password_hash.clone())
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
                     .name("filite-auth-cookie")
