@@ -17,7 +17,7 @@ use std::{fs, path::PathBuf};
 fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     match i32::from_str_radix(id, 36) {
         Ok(id) => Ok(id),
-        Err(_) => Err(HttpResponse::BadRequest().finish()),
+        Err(_) => Err(HttpResponse::BadRequest().body("Invalid ID")),
     }
 }
 
@@ -34,12 +34,12 @@ fn auth(
     let header = match request.headers().get("Authorization") {
         Some(h) => match h.to_str() {
             Ok(h) => h,
-            Err(_) => return Err(HttpResponse::BadRequest().finish()),
+            Err(_) => return Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
         },
         None => {
             return Err(HttpResponse::Unauthorized()
                 .header("WWW-Authenticate", "Basic realm=\"filite\"")
-                .finish())
+                .body("Unauthorized"))
         }
     };
     let connection_string = header.replace("Basic ", "");
@@ -49,10 +49,10 @@ fn auth(
                 c.splitn(2, |b| b == &b':').map(|s| s.to_vec()).collect();
             match credentials.len() {
                 2 => (credentials[0].clone(), credentials[1].clone()),
-                _ => return Err(HttpResponse::BadRequest().finish()),
+                _ => return Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
             }
         }
-        Err(_) => return Err(HttpResponse::BadRequest().finish()),
+        Err(_) => return Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
     };
 
     match setup::hash(password).as_slice() == password_hash {
@@ -61,11 +61,11 @@ fn auth(
                 identity.remember(u);
                 Ok(())
             }
-            Err(_) => Err(HttpResponse::BadRequest().finish()),
+            Err(_) => Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
         },
         false => Err(HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Basic realm=\"filite\"")
-            .finish()),
+            .body("Unauthorized")),
     }
 }
 
@@ -76,7 +76,7 @@ fn match_replace_result<T: Serialize>(
 ) -> Result<HttpResponse, HttpResponse> {
     match result {
         Ok(x) => Ok(HttpResponse::Created().json(x)),
-        Err(_) => Err(HttpResponse::InternalServerError().finish()),
+        Err(_) => Err(HttpResponse::InternalServerError().body("Internal server error")),
     }
 }
 
@@ -85,10 +85,12 @@ fn match_replace_result<T: Serialize>(
 fn match_find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, HttpResponse> {
     match error {
         BlockingError::Error(e) => match e {
-            diesel::result::Error::NotFound => Err(HttpResponse::NotFound().finish()),
-            _ => Err(HttpResponse::InternalServerError().finish()),
+            diesel::result::Error::NotFound => Err(HttpResponse::NotFound().body("Not found")),
+            _ => Err(HttpResponse::InternalServerError().body("Internal server error")),
         },
-        BlockingError::Canceled => Err(HttpResponse::InternalServerError().finish()),
+        BlockingError::Canceled => {
+            Err(HttpResponse::InternalServerError().body("Internal server error"))
+        }
     }
 }
 
@@ -115,7 +117,8 @@ macro_rules! select {
                     actix_web::web::block(move || crate::queries::$m::select(filters, pool)).then(
                         |result| match result {
                             Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
-                            Err(_) => Err(actix_web::HttpResponse::InternalServerError().finish()),
+                            Err(_) => Err(actix_web::HttpResponse::InternalServerError()
+                                .body("Internal server error")),
                         },
                     )
                 })
@@ -139,7 +142,7 @@ macro_rules! delete {
                 .and_then(move |id| {
                     actix_web::web::block(move || crate::queries::$m::delete(id, pool)).then(
                         |result| match result {
-                            Ok(()) => Ok(actix_web::HttpResponse::NoContent().finish()),
+                            Ok(()) => Ok(actix_web::HttpResponse::NoContent().body("Deleted")),
                             Err(e) => crate::routes::match_find_error(e),
                         },
                     )
@@ -238,7 +241,7 @@ pub fn logout(identity: Identity) -> impl Responder {
         }
         false => HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Basic realm=\"filite\"")
-            .finish(),
+            .body("Unauthorized"),
     }
 }
 
@@ -273,7 +276,7 @@ pub mod files {
                             path.push(file.filepath);
                             match NamedFile::open(&path) {
                                 Ok(nf) => Ok(nf),
-                                Err(_) => Err(HttpResponse::NotFound().finish()),
+                                Err(_) => Err(HttpResponse::NotFound().body("Not found")),
                             }
                         }
                         Err(e) => match_find_error(e),
@@ -304,44 +307,44 @@ pub mod files {
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || {
-                let mut path = config.files_dir.clone();
-                let mut relative_path = PathBuf::new();
-                if fs::create_dir_all(&path).is_err() {
-                    return Err(http::StatusCode::from_u16(500).unwrap());
-                }
-
-                let mut filename = body.filename.clone();
-                filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
-                path.push(&filename);
-                relative_path.push(&filename);
-
-                let relative_path = match relative_path.to_str() {
-                    Some(rp) => rp,
-                    None => return Err(http::StatusCode::from_u16(500).unwrap()),
-                };
-
-                let contents = match base64::decode(&body.base64) {
-                    Ok(contents) => contents,
-                    Err(_) => return Err(http::StatusCode::from_u16(400).unwrap()),
-                };
-                if fs::write(&path, contents).is_err() {
-                    return Err(http::StatusCode::from_u16(500).unwrap());
-                }
-
-                match queries::files::replace(id, relative_path, pool) {
-                    Ok(file) => Ok(file),
-                    Err(_) => Err(http::StatusCode::from_u16(500).unwrap()),
-                }
-            })
-            .then(|result| match result {
-                Ok(file) => Ok(HttpResponse::Created().json(file)),
-                Err(e) => match e {
-                    BlockingError::Error(sc) => Err(HttpResponse::new(sc)),
-                    BlockingError::Canceled => {
-                        Err(HttpResponse::InternalServerError().finish())
+                    let mut path = config.files_dir.clone();
+                    let mut relative_path = PathBuf::new();
+                    if fs::create_dir_all(&path).is_err() {
+                        return Err(http::StatusCode::from_u16(500).unwrap());
                     }
-                },
-            })
+
+                    let mut filename = body.filename.clone();
+                    filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
+                    path.push(&filename);
+                    relative_path.push(&filename);
+
+                    let relative_path = match relative_path.to_str() {
+                        Some(rp) => rp,
+                        None => return Err(http::StatusCode::from_u16(500).unwrap()),
+                    };
+
+                    let contents = match base64::decode(&body.base64) {
+                        Ok(contents) => contents,
+                        Err(_) => return Err(http::StatusCode::from_u16(400).unwrap()),
+                    };
+                    if fs::write(&path, contents).is_err() {
+                        return Err(http::StatusCode::from_u16(500).unwrap());
+                    }
+
+                    match queries::files::replace(id, relative_path, pool) {
+                        Ok(file) => Ok(file),
+                        Err(_) => Err(http::StatusCode::from_u16(500).unwrap()),
+                    }
+                })
+                .then(|result| match result {
+                    Ok(file) => Ok(HttpResponse::Created().json(file)),
+                    Err(e) => match e {
+                        BlockingError::Error(sc) => Err(HttpResponse::new(sc)),
+                        BlockingError::Canceled => {
+                            Err(HttpResponse::InternalServerError().body("Internal server error"))
+                        }
+                    },
+                })
             })
             .from_err()
     }
