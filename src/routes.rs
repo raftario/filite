@@ -38,15 +38,33 @@ fn auth(
         },
         None => {
             return Err(HttpResponse::Unauthorized()
-                .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+                .header("WWW-Authenticate", "Basic realm=\"filite\"")
                 .finish())
         }
     };
-    let password = header.replace("Bearer ", "");
-    match setup::hash(&password).as_slice() == password_hash {
-        true => Ok(()),
+    let connection_string = header.replace("Basic ", "");
+    let (user, password) = match base64::decode(&connection_string) {
+        Ok(c) => {
+            let credentials: Vec<Vec<u8>> =
+                c.splitn(2, |b| b == &b':').map(|s| s.to_vec()).collect();
+            match credentials.len() {
+                2 => (credentials[0].clone(), credentials[1].clone()),
+                _ => return Err(HttpResponse::BadRequest().finish()),
+            }
+        }
+        Err(_) => return Err(HttpResponse::BadRequest().finish()),
+    };
+
+    match setup::hash(password).as_slice() == password_hash {
+        true => match String::from_utf8(user.to_vec()) {
+            Ok(u) => {
+                identity.remember(u);
+                Ok(())
+            }
+            Err(_) => Err(HttpResponse::BadRequest().finish()),
+        },
         false => Err(HttpResponse::Unauthorized()
-            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+            .header("WWW-Authenticate", "Basic realm=\"filite\"")
             .finish()),
     }
 }
@@ -169,7 +187,15 @@ lazy_static! {
 }
 
 /// Index page letting users upload via a UI
-pub fn index(_identity: Identity) -> impl Responder {
+pub fn index(
+    request: HttpRequest,
+    identity: Identity,
+    password_hash: web::Data<Vec<u8>>,
+) -> impl Responder {
+    if let Err(response) = auth(identity, request, &password_hash) {
+        return response;
+    }
+
     let contents = {
         #[cfg(feature = "dev")]
         {
@@ -203,63 +229,15 @@ pub fn get_config(
     }
 }
 
-/// Login route
-pub fn login(
-    request: HttpRequest,
-    identity: Identity,
-    password_hash: web::Data<Vec<u8>>,
-) -> impl Responder {
-    if identity.identity().is_some() {
-        return HttpResponse::Found().header("Location", "..").finish();
-    }
-
-    let header = match request.headers().get("Authorization") {
-        Some(h) => match h.to_str() {
-            Ok(h) => h,
-            Err(_) => return HttpResponse::BadRequest().finish(),
-        },
-        None => {
-            return HttpResponse::Unauthorized()
-                .header("WWW-Authenticate", "Basic realm=\"filite\"")
-                .finish()
-        }
-    };
-    let connection_string = header.replace("Basic ", "");
-    let (user, password) = match base64::decode(&connection_string) {
-        Ok(c) => {
-            let credentials: Vec<Vec<u8>> =
-                c.splitn(2, |b| b == &b':').map(|s| s.to_vec()).collect();
-            match credentials.len() {
-                2 => (credentials[0].clone(), credentials[1].clone()),
-                _ => return HttpResponse::BadRequest().finish(),
-            }
-        }
-        Err(_) => return HttpResponse::BadRequest().finish(),
-    };
-
-    match setup::hash(password).as_slice() == password_hash.as_slice() {
-        true => match String::from_utf8(user.to_vec()) {
-            Ok(u) => {
-                identity.remember(u);
-                HttpResponse::Found().header("Location", "..").finish()
-            }
-            Err(_) => HttpResponse::BadRequest().finish(),
-        },
-        false => HttpResponse::Unauthorized()
-            .header("WWW-Authenticate", "Basic realm=\"filite\"")
-            .finish(),
-    }
-}
-
 /// Logout route
 pub fn logout(identity: Identity) -> impl Responder {
     match identity.identity().is_some() {
         true => {
             identity.forget();
-            HttpResponse::Found().header("Location", "..").finish()
+            HttpResponse::Ok().body("Logged out")
         }
         false => HttpResponse::Unauthorized()
-            .header("WWW-Authenticate", "Bearer realm=\"filite\"")
+            .header("WWW-Authenticate", "Basic realm=\"filite\"")
             .finish(),
     }
 }

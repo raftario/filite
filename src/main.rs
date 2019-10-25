@@ -87,7 +87,6 @@ fn main() {
             ))
             .wrap(setup::logger_middleware())
             .route("/", web::get().to(routes::index))
-            .route("/login", web::get().to(routes::login))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))
             .route("/f", web::get().to_async(routes::files::gets))
