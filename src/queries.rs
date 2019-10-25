@@ -47,10 +47,11 @@ macro_rules! common_select {
             $q = $q.limit(limit);
         }
 
-        match $f.asc {
-            false => $q = $q.order(created.desc()),
-            true => $q = $q.order(created.asc()),
-        }
+        $q = if $f.asc {
+            $q.order(created.asc())
+        } else {
+            $q.order(created.desc())
+        };
     };
 }
 

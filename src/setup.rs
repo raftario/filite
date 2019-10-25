@@ -99,13 +99,7 @@ impl Default for Config {
                 .expect("Can't convert database path to string")
                 .to_owned()
         };
-        let pool_size = {
-            let n = num_cpus::get() as u32 / 2;
-            match n < 1 {
-                true => 1,
-                false => n,
-            }
-        };
+        let pool_size = std::cmp::max(1, num_cpus::get() as u32 / 2);
         let files_dir = {
             let mut path = get_data_dir();
             path.push("files");
@@ -141,7 +135,7 @@ impl Config {
         let mut result: Config = result.unwrap();
 
         if result.files_dir.is_absolute() {
-            if let Err(_) = fs::create_dir_all(&result.files_dir) {
+            if fs::create_dir_all(&result.files_dir).is_err() {
                 return Err("Can't create files_dir.");
             }
 
@@ -153,7 +147,7 @@ impl Config {
             let mut data_dir = get_data_dir();
             data_dir.push(&result.files_dir);
 
-            if let Err(_) = fs::create_dir_all(&data_dir) {
+            if fs::create_dir_all(&data_dir).is_err() {
                 return Err("Can't create files_dir.");
             }
 
@@ -279,7 +273,7 @@ pub fn init() -> Config {
             process::exit(1);
         });
 
-        let mut config_path = data_dir.clone();
+        let mut config_path = data_dir;
         config_path.push("config.toml");
         eprintln!(
             "Almost ready. To get started, edit the config file at {} and restart.",
