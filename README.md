@@ -63,8 +63,8 @@ Don't forget to replace `8080` with the port specified in your config and `examp
 
 ```nginx
 server {
-    listen 8080;
-    listen [::]:8080;
+    listen 80;
+    listen [::]:80;
 
     server_name example.com;
 
