@@ -4,6 +4,15 @@ version = "0.1.0"
 authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
 description = "A simple, light and standalone pastebin, URL shortener and file-sharing service"
+homepage = "https://github.com/raftario/filite"
+repository = "https://github.com/raftario/filite"
+readme = "README.md"
+keywords = [
+    "file-sharing",
+    "url-shortener",
+    "pastebin"
+]
+license = "MIT"
 
 [dependencies]
 actix-files = "0.1.6"
