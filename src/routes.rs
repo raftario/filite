@@ -461,7 +461,6 @@ pub mod texts {
     #[derive(Deserialize)]
     pub struct PutText {
         pub contents: String,
-        pub highlight: bool,
     }
 
     /// PUT a new text entry
@@ -476,10 +475,8 @@ pub mod texts {
         future::result(auth(identity, request, &token_hash))
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
-                web::block(move || {
-                    queries::texts::replace(id, &body.contents, body.highlight, pool)
-                })
-                .then(|result| match_replace_result(result))
+                web::block(move || queries::texts::replace(id, &body.contents, pool))
+                    .then(|result| match_replace_result(result))
             })
             .from_err()
     }

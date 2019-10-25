@@ -18,7 +18,6 @@ table! {
     texts (id) {
         id -> Integer,
         contents -> Text,
-        highlight -> Integer,
         created -> Integer,
     }
 }
