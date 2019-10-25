@@ -108,6 +108,10 @@ main div textarea:invalid {
     border: 0.0625rem solid #dc322f;
 }
 
+.conflict {
+    border: 0.0625rem solid #b58900 !important;
+}
+
 main div button {
     display: block;
     padding: 0.5rem 1rem;

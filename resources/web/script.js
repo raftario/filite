@@ -31,9 +31,33 @@ const inputs = {
     ],
 };
 
+const used = {
+    files: [],
+    links: [],
+    texts: [],
+};
+
+let baseUrl = `${location.protocol}//${location.host}${location.pathname}`;
+if (!baseUrl.endsWith("/")) {
+    baseUrl += "/";
+}
+
+const fetchUsed = () => {
+    fetch(`${baseUrl}f`)
+        .then((response) => response.json())
+        .then((json) => (used.files = json));
+    fetch(`${baseUrl}l`)
+        .then((response) => response.json())
+        .then((json) => (used.links = json));
+    fetch(`${baseUrl}t`)
+        .then((response) => response.json())
+        .then((json) => (used.texts = json));
+};
+fetchUsed();
+
 const randomUrl = () => {
     return Math.floor(Math.random() * 2147483647).toString(36);
-}
+};
 
 for (const group in tabs) {
     tabs[group][0].onclick = () => {
@@ -49,12 +73,6 @@ for (const group in tabs) {
 
 for (const group in inputs) {
     const submitButton = inputs[group][inputs[group].length - 1];
-
-    const checkValidity = () => {
-        submitButton.disabled = inputs[group].some(
-            (input) => input.validity != undefined && !input.validity.valid
-        );
-    };
 
     const urlInput = inputs[group][0];
     urlInput.addEventListener("input", () => {
@@ -77,6 +95,17 @@ for (const group in inputs) {
         }
     });
 
+    const checkValidity = () => {
+        if (used[group].some((x) => x.id === parseInt(urlInput.value, 36))) {
+            urlInput.classList.add("conflict");
+        } else {
+            urlInput.classList.remove("conflict");
+        }
+        submitButton.disabled = inputs[group].some(
+            (input) => input.validity != undefined && !input.validity.valid
+        );
+    };
+
     for (const input of inputs[group].filter(
         (input) =>
             input instanceof HTMLInputElement ||
@@ -96,11 +125,6 @@ for (const group in inputs) {
         }
         submitButton.disabled = true;
     };
-
-    let baseUrl = `${location.protocol}//${location.host}${location.pathname}`;
-    if (!baseUrl.endsWith("/")) {
-        baseUrl += "/";
-    }
 
     if (group === "files") {
         const filesFileInput = inputs.files[1];
@@ -150,6 +174,7 @@ for (const group in inputs) {
                             window.open(url, "_blank");
                             clearInputs();
                             filesValueInput.value = "";
+                            fetchUsed();
                         }
                     })
                     .catch((error) => alert(error));
@@ -178,6 +203,7 @@ for (const group in inputs) {
                     } else {
                         window.open(url, "_blank");
                         clearInputs();
+                        fetchUsed();
                     }
                 })
                 .catch((error) => alert(error));
@@ -204,6 +230,7 @@ for (const group in inputs) {
                     } else {
                         window.open(url, "_blank");
                         clearInputs();
+                        fetchUsed();
                     }
                 })
                 .catch((error) => alert(error));
