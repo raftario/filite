@@ -21,22 +21,22 @@ jobs:
         args: --release
     - name: Strip binary (*nix)
       if: matrix.os != 'windows-latest'
-      run: strip target/release/licensor
+      run: strip target/release/filite
     - name: Archive binary (Linux)
       if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v1
       with:
         name: Linux
-        path: target/release/licensor
+        path: target/release/filite
     - name: Archive binary (Windows)
       if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v1
       with:
         name: Windows
-        path: target/release/licensor.exe
+        path: target/release/filite.exe
     - name: Archive binary (macOS)
       if: matrix.os == 'macOS-latest'
       uses: actions/upload-artifact@v1
       with:
         name: macOS
-        path: target/release/licensor
+        path: target/release/filite
