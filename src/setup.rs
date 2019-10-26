@@ -27,25 +27,27 @@ use toml;
 /// Returns a path to the directory storing application data
 #[cfg(not(feature = "dev"))]
 pub fn get_data_dir() -> PathBuf {
-    let mut dir = dirs::home_dir().expect("Can't find home directory.");
-    dir.push(".filite");
-    dir
+    let base_dir = dirs::data_dir().expect("Unable to determine the data directory");
+    base_dir.join(env!("CARGO_PKG_NAME"))
+}
+
+/// Returns a path to the directory storing application config
+#[cfg(not(feature = "dev"))]
+pub fn get_config_dir() -> PathBuf {
+    let base_dir = dirs::config_dir().expect("Unable to determine the config directory");
+    base_dir.join(env!("CARGO_PKG_NAME"))
 }
 
 /// Returns a path to the configuration file
 #[cfg(not(feature = "dev"))]
 fn get_config_path() -> PathBuf {
-    let mut path = get_data_dir();
-    path.push("config.toml");
-    path
+    get_config_dir().join("config.toml")
 }
 
 /// Returns a path to the bearer token hash
 #[cfg(not(feature = "dev"))]
 pub fn get_password_path() -> PathBuf {
-    let mut path = get_data_dir();
-    path.push("passwd");
-    path
+    get_config_dir().join("passwd")
 }
 
 /// Returns the BLAKE2b digest of the input string
@@ -93,18 +95,13 @@ impl Default for Config {
     fn default() -> Self {
         let port = 8080;
         let database_url = {
-            let mut path = get_data_dir();
-            path.push("database.db");
+            let path = get_data_dir().join("database.db");
             path.to_str()
                 .expect("Can't convert database path to string")
                 .to_owned()
         };
         let pool_size = std::cmp::max(1, num_cpus::get() as u32 / 2);
-        let files_dir = {
-            let mut path = get_data_dir();
-            path.push("files");
-            path
-        };
+        let files_dir = get_data_dir().join("files");
         let max_filesize = 10_000_000;
 
         Config {
@@ -144,14 +141,13 @@ impl Config {
                 Err(_) => return Err("Invalid files_dir."),
             }
         } else {
-            let mut data_dir = get_data_dir();
-            data_dir.push(&result.files_dir);
+            let files_dir = get_data_dir().join(&result.files_dir);
 
-            if fs::create_dir_all(&data_dir).is_err() {
+            if fs::create_dir_all(&files_dir).is_err() {
                 return Err("Can't create files_dir.");
             }
 
-            result.files_dir = match data_dir.canonicalize() {
+            result.files_dir = match files_dir.canonicalize() {
                 Ok(path) => path,
                 Err(_) => return Err("Invalid files_dir."),
             }
@@ -246,19 +242,22 @@ pub fn logger_middleware() -> Logger {
 /// Performs the initial setup
 #[cfg(not(feature = "dev"))]
 pub fn init() -> Config {
-    let data_dir = get_data_dir();
-    if !data_dir.exists() {
-        eprintln!("Generating config file...");
-        fs::create_dir_all(&data_dir)
-            .unwrap_or_else(|e| eprintln!("Can't create config directory: {}.", e));
+    let config_dir = get_config_dir();
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).unwrap_or_else(|e| {
+            eprintln!("Can't create config directory: {}.", e);
+            process::exit(1);
+        });
+
+        println!("Generating config file...");
         Config::default().write_file().unwrap_or_else(|e| {
-            eprintln!("{}", e);
+            eprintln!("Couldn't write the config file: {}", e);
             process::exit(1);
         });
 
         let stdin = io::stdin();
         let mut stdin = stdin.lock();
-        eprintln!("Enter the password to use:");
+        println!("Enter the password to use:");
         let mut password = String::new();
         stdin.read_line(&mut password).unwrap_or_else(|e| {
             eprintln!("Can't read password: {}", e);
@@ -273,14 +272,17 @@ pub fn init() -> Config {
             process::exit(1);
         });
 
-        let mut config_path = data_dir;
-        config_path.push("config.toml");
-        eprintln!(
+        println!(
             "Almost ready. To get started, edit the config file at {} and restart.",
-            &config_path.to_str().unwrap(),
+            get_config_path().display(),
         );
         process::exit(0);
     }
+
+    fs::create_dir_all(get_data_dir()).unwrap_or_else(|e| {
+        eprintln!("Can't create data directory: {}.", e);
+        process::exit(1);
+    });
 
     Config::read_file().unwrap_or_else(|e| {
         eprintln!("{}", e);
