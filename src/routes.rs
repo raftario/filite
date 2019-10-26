@@ -55,17 +55,18 @@ fn auth(
         Err(_) => return Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
     };
 
-    match setup::hash(password).as_slice() == password_hash {
-        true => match String::from_utf8(user.to_vec()) {
+    if setup::hash(password).as_slice() == password_hash {
+        match String::from_utf8(user.to_vec()) {
             Ok(u) => {
                 identity.remember(u);
                 Ok(())
             }
             Err(_) => Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
-        },
-        false => Err(HttpResponse::Unauthorized()
+        }
+    } else {
+        Err(HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Basic realm=\"filite\"")
-            .body("Unauthorized")),
+            .body("Unauthorized"))
     }
 }
 
@@ -97,7 +98,7 @@ fn match_find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T,
 /// Formats a timestamp to the "Last-Modified" header format
 fn timestamp_to_last_modified(timestamp: i32) -> String {
     let datetime =
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp as i64, 0), Utc);
+        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(i64::from(timestamp), 0), Utc);
     datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
@@ -233,14 +234,13 @@ pub fn get_config(
 
 /// Logout route
 pub fn logout(identity: Identity) -> impl Responder {
-    match identity.identity().is_some() {
-        true => {
-            identity.forget();
-            HttpResponse::Ok().body("Logged out")
-        }
-        false => HttpResponse::Unauthorized()
+    if identity.identity().is_some() {
+        identity.forget();
+        HttpResponse::Ok().body("Logged out")
+    } else {
+        HttpResponse::Unauthorized()
             .header("WWW-Authenticate", "Basic realm=\"filite\"")
-            .body("Unauthorized"),
+            .body("Unauthorized")
     }
 }
 
@@ -402,7 +402,7 @@ pub mod links {
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || queries::links::replace(id, &body.forward, pool))
-                    .then(|result| match_replace_result(result))
+                    .then(match_replace_result)
             })
             .from_err()
     }
@@ -460,7 +460,7 @@ pub mod texts {
             .and_then(move |_| future::result(parse_id(&path)))
             .and_then(move |id| {
                 web::block(move || queries::texts::replace(id, &body.contents, pool))
-                    .then(|result| match_replace_result(result))
+                    .then(match_replace_result)
             })
             .from_err()
     }
