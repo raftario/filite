@@ -251,14 +251,33 @@ pub fn init() -> Config {
     if !password_path.exists() {
         let stdin = io::stdin();
         let mut stdin = stdin.lock();
-        println!("Enter the password to use:");
         let mut password = String::new();
-        stdin.read_line(&mut password).unwrap_or_else(|e| {
-            eprintln!("Can't read password: {}", e);
-            process::exit(1);
-        });
-        password = password.replace("\r", "");
-        password = password.replace("\n", "");
+
+        loop {
+            println!("Enter the password to use: ");
+            stdin.read_line(&mut password).unwrap_or_else(|e| {
+                eprintln!("Can't read password: {}", e);
+                process::exit(1);
+            });
+
+            password = password.replace("\r", "");
+            password = password.replace("\n", "");
+            if !password.is_empty() {
+                break;
+            }
+
+            println!("Are you sure you want to leave an empty password? This will disable authentication: [y/N]: ");
+            let mut answer = String::new();
+            stdin.read_line(&mut answer).unwrap_or_else(|e| {
+                eprintln!("Can't read password: {}", e);
+                process::exit(1);
+            });
+
+            if answer.trim() == "y" {
+                break;
+            }
+        }
+
         let password_hash = hash(&password);
         fs::write(&password_path, password_hash.as_slice()).unwrap_or_else(|e| {
             eprintln!("Can't write password: {}", e);
