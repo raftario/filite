@@ -19,7 +19,7 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 2. Run it a first time and follow the instructions
 3. Edit your config file, check the [dedicated section](#Config) for details
 4. Run the binary again and you're good to go, just browse to http://localhost:8080 (don't forget to replace `8080` with the port specified in your config)
-5. Optionally, set up a [reverse proxy](#Reverse proxy)
+5. Optionally, set up a [reverse proxy](#reverse-proxy)
 
 ## Usage
 
@@ -29,7 +29,7 @@ When asked for a login, use whatever username you want and the password you prov
 * Press space in the URL input to generate a random one
 * If the entered URL is already in use, the input will have a yellow outline
 
-Details for programmatic usage are provided in [the dedicated section](#Programmatic usage).
+Details for programmatic usage are provided in [the dedicated section](#programmatic-usage).
 
 ## Planned features
 
