@@ -242,19 +242,13 @@ pub fn logger_middleware() -> Logger {
 /// Performs the initial setup
 #[cfg(not(feature = "dev"))]
 pub fn init() -> Config {
-    let config_dir = get_config_dir();
-    if !config_dir.exists() {
-        fs::create_dir_all(&config_dir).unwrap_or_else(|e| {
-            eprintln!("Can't create config directory: {}.", e);
-            process::exit(1);
-        });
+    fs::create_dir_all(get_config_dir()).unwrap_or_else(|e| {
+        eprintln!("Can't create config directory: {}.", e);
+        process::exit(1);
+    });
 
-        println!("Generating config file...");
-        Config::default().write_file().unwrap_or_else(|e| {
-            eprintln!("Couldn't write the config file: {}", e);
-            process::exit(1);
-        });
-
+    let password_path = get_password_path();
+    if !password_path.exists() {
         let stdin = io::stdin();
         let mut stdin = stdin.lock();
         println!("Enter the password to use:");
@@ -266,23 +260,22 @@ pub fn init() -> Config {
         password = password.replace("\r", "");
         password = password.replace("\n", "");
         let password_hash = hash(&password);
-        let password_path = get_password_path();
         fs::write(&password_path, password_hash.as_slice()).unwrap_or_else(|e| {
             eprintln!("Can't write password: {}", e);
             process::exit(1);
         });
-
-        println!(
-            "Almost ready. To get started, edit the config file at {} and restart.",
-            get_config_path().display(),
-        );
-        process::exit(0);
     }
 
-    fs::create_dir_all(get_data_dir()).unwrap_or_else(|e| {
-        eprintln!("Can't create data directory: {}.", e);
-        process::exit(1);
-    });
+    let config_path = get_config_path();
+    if !config_path.exists() {
+        println!("Generating config file at {}", config_path.display());
+        let config = Config::default();
+        config.write_file().unwrap_or_else(|e| {
+            eprintln!("Couldn't write the config file: {}", e);
+            process::exit(1);
+        });
+        return config;
+    }
 
     Config::read_file().unwrap_or_else(|e| {
         eprintln!("{}", e);
