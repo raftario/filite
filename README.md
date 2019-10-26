@@ -77,6 +77,12 @@ server {
 }
 ```
 
+### Caddy 2
+
+```
+./caddy2 reverse-proxy -from http://example.com -to http://localhost:8080
+```
+
 ## Programmatic usage
 
 ### Posting new elements
