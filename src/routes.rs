@@ -31,6 +31,11 @@ fn auth(
         return Ok(());
     }
 
+    if password_hash == setup::hash("").as_slice() {
+        identity.remember("guest".into());
+        return Ok(());
+    }
+
     let header = match request.headers().get("Authorization") {
         Some(h) => match h.to_str() {
             Ok(h) => h,
