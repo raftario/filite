@@ -269,7 +269,7 @@ pub fn init() -> Config {
             println!("Are you sure you want to leave an empty password? This will disable authentication: [y/N]: ");
             let mut answer = String::new();
             stdin.read_line(&mut answer).unwrap_or_else(|e| {
-                eprintln!("Can't read password: {}", e);
+                eprintln!("Can't read answer: {}", e);
                 process::exit(1);
             });
 
