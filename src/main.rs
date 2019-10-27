@@ -77,6 +77,8 @@ fn main() {
     let port = config.port;
     let max_filesize = (config.max_filesize as f64 * 1.37) as usize;
 
+    println!("Listening on port {}", port);
+
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
