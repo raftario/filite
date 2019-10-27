@@ -271,7 +271,7 @@ pub fn init() -> Config {
         println!("Generating config file at {}", config_path.display());
         let config = Config::default();
         config.write_file().unwrap_or_else(|e| {
-            eprintln!("Couldn't write the config file: {}", e);
+            eprintln!("Can't write config file: {}", e);
             process::exit(1);
         });
         return config;
