@@ -59,6 +59,19 @@ const randomUrl = () => {
     return Math.floor(Math.random() * 2147483647).toString(36);
 };
 
+const updateClipboard = (data) => {
+    navigator.permissions
+        .query({ name: "clipboard-write" })
+        .then((result) => {
+            if (result.state === "denied") {
+                throw new Error();
+            }
+        })
+        .then(() => navigator.clipboard.writeText(data))
+        .then(() => alert("URL copied to clipboard"))
+        .catch(() => alert(data));
+};
+
 for (const group in tabs) {
     tabs[group][0].onclick = () => {
         const active = document.querySelectorAll(".active");
@@ -75,7 +88,7 @@ for (const group in inputs) {
     const submitButton = inputs[group][inputs[group].length - 1];
 
     const urlInput = inputs[group][0];
-    urlInput.addEventListener("input", () => {
+    urlInput.addEventListener("input", (e) => {
         if (urlInput.value[urlInput.value.length - 1] === " ") {
             urlInput.value = randomUrl();
             checkValidity();
@@ -171,7 +184,7 @@ for (const group in inputs) {
                         if (status !== 201) {
                             throw new Error(text);
                         } else {
-                            window.open(url, "_blank");
+                            updateClipboard(url);
                             clearInputs();
                             filesValueInput.value = "";
                             fetchUsed();
@@ -201,7 +214,7 @@ for (const group in inputs) {
                     if (status !== 201) {
                         throw new Error(text);
                     } else {
-                        window.open(url, "_blank");
+                        updateClipboard(url);
                         clearInputs();
                         fetchUsed();
                     }
@@ -228,7 +241,7 @@ for (const group in inputs) {
                     if (status !== 201) {
                         throw new Error(text);
                     } else {
-                        window.open(url, "_blank");
+                        updateClipboard(url);
                         clearInputs();
                         fetchUsed();
                     }
