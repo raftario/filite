@@ -43,7 +43,7 @@ Details for programmatic usage are provided in [the dedicated section](#programm
 
 ## Config
 
-The config is located at `~/.filite/config.toml` and follows the following format. Most of the time, the defaults are reasonable.
+The config follows the following format. Most of the time, the defaults are reasonable.
 
 ```toml
 # Port to listen on
