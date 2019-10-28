@@ -25,7 +25,7 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 
 When asked for a login, use whatever username you want and the password you provided during setup. Usage is pretty straightforward using the web UI, but here are some tips.
 
-* Make sure to allow popups to allow created links to open in a new tab
+* On successful submission, the URL will be copied to clipboard. If copying to clipboard fails, it will be displayed as an alert.
 * Press space in the URL input to generate a random one
 * If the entered URL is already in use, the input will have a yellow outline
 
