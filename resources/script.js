@@ -76,6 +76,13 @@ for (const group in inputs) {
 
     const urlInput = inputs[group][0];
     urlInput.addEventListener("input", () => {
+        if (urlInput.value[urlInput.value.length - 1] === " ") {
+            urlInput.value = randomUrl();
+            checkValidity();
+            e.preventDefault();
+            return;
+        }
+
         urlInput.value = urlInput.value
             .replace(/[^0-9A-Za-z]/g, "")
             .toLowerCase();
@@ -85,13 +92,6 @@ for (const group in inputs) {
             );
         } else {
             urlInput.setCustomValidity("");
-        }
-    });
-    urlInput.addEventListener("keyup", (e) => {
-        if (e.code === "Space") {
-            urlInput.value = randomUrl();
-            checkValidity();
-            e.preventDefault();
         }
     });
 
