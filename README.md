@@ -73,6 +73,10 @@ server {
 
     location / {
         proxy_pass http://localhost:8080;
+        
+        location /f {
+            client_max_body_size 10M;
+        }
     }
 }
 ```
