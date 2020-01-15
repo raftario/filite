@@ -7,9 +7,15 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 
 ## Features
 
+### What it is
+
 * Easy to use. Installation and set-up take less than a minute and a built-in web UI is provided.
 * Standalone. No external dependencies required, everything that is needed is packed into the binary.
 * Light and fast. The Rust web framework [Actix](https://actix.rs) is used under the hood, providing great speed with a minimal footprint.
+
+### What it is not
+
+* A tracking tool. No stats are stored to increase speed and reduce resource usage, if this is what you are looking for this tool is not for you.
 
 ![Screenshot of filite UI](screenshot.png)
 
@@ -17,7 +23,7 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 
 1. Get the binary either from the [releases page](https://github.com/raftario/filite/releases) or [using Cargo](https://crates.io/crates/filite)
 2. Run it a first time and follow the instructions
-3. Edit your config file, check the [dedicated section](#Config) for details
+3. Edit your config file, check the [dedicated section](#config) for details
 4. Run the binary again and you're good to go, just browse to http://localhost:8080 (don't forget to replace `8080` with the port specified in your config)
 5. Optionally, set up a [reverse proxy](#reverse-proxy)
 
@@ -35,9 +41,6 @@ Details for programmatic usage are provided in [the dedicated section](#programm
 
 * Decent test suite
 * TLS support
-* Opt-in stats (visits per element over time)
-* Opt-in syntax highlighting for text
-* Multiple users and passwords
 * Simple admin page
 * systemd service generation
 
@@ -56,13 +59,82 @@ pool_size = 4
 files_dir = "files"
 # Max allowed size for file uploads, in bytes
 max_filesize = 10000000
+# Highlight.js configuration
+[highlight]
+# Theme to use
+theme = "github"
+# Additional languages to import
+languages = ["rust"]
+```
+
+## Client tools
+
+### ShareX
+
+> To get the value of `AUTORIZATION` convert `<USERNAME>:<PASSWORD>` to base64.
+> Don't forget to replace `http://example.com` with your own address.
+
+#### File
+
+```json
+{
+  "Version": "13.0.1",
+  "Name": "filite (file)",
+  "DestinationType": "ImageUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "http://example.com/f",
+  "Headers": {
+    "Authorization": "Basic <AUTORIZATION>"
+  },
+  "Body": "MultipartFormData",
+  "FileFormName": "file",
+  "URL": "http://example.com/f/$response$"
+}
+```
+
+#### Link
+
+```json
+{
+  "Version": "13.0.1",
+  "Name": "filite (link)",
+  "DestinationType": "URLShortener",
+  "RequestMethod": "POST",
+  "RequestURL": "http://example.com/l",
+  "Headers": {
+    "Authorization": "Basic <AUTORIZATION>"
+  },
+  "Body": "JSON",
+  "Data": "{\"forward\":\"$input$\"}",
+  "URL": "http://example.com/l/$response$"
+}
+```
+
+#### Text
+
+> You can remove the prompt and always enable syntax highlighting by replacing `$prompt:Highlight|false$` with `true` or `false`.
+
+```json
+{
+  "Version": "13.0.1",
+  "Name": "filite (text)",
+  "DestinationType": "TextUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "http://example.com/t",
+  "Headers": {
+    "Authorization": "Basic <AUTORIZATION>"
+  },
+  "Body": "JSON",
+  "Data": "{\"contents\":\"$input$\",\"highlight\":$prompt:Highlight|false$}",
+  "URL": "http://example.com/t/$response$"
+}
 ```
 
 ## Reverse proxy
 
 ### NGINX
 
-Don't forget to replace `8080` with the port specified in your config and `example.com` with your own domain.
+> Don't forget to replace `8080` with the port specified in your config and `example.com` with your own domain.
 
 ```nginx
 server {
