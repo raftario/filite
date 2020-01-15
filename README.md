@@ -17,8 +17,6 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 
 * A tracking tool. No stats are stored to increase speed and reduce resource usage, if this is what you are looking for this tool is not for you.
 
-![Screenshot of filite UI](screenshot.png)
-
 ## Installation
 
 1. Get the binary either from the [releases page](https://github.com/raftario/filite/releases) or [using Cargo](https://crates.io/crates/filite)
@@ -59,6 +57,7 @@ pool_size = 4
 files_dir = "files"
 # Max allowed size for file uploads, in bytes
 max_filesize = 10000000
+
 # Highlight.js configuration
 [highlight]
 # Theme to use

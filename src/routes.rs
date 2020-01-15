@@ -219,39 +219,17 @@ macro_rules! random_id {
 
 #[cfg(feature = "dev")]
 lazy_static! {
-    static ref RESOURCES_DIR: PathBuf = {
-        let mut ressources_dir = PathBuf::new();
-        ressources_dir.push(get_env!("CARGO_MANIFEST_DIR"));
-        ressources_dir.push("resources");
-        ressources_dir
-    };
-    static ref HTML_PATH: PathBuf = {
-        let mut html_path = RESOURCES_DIR.clone();
-        html_path.push("index.html");
-        html_path
-    };
-    static ref JS_PATH: PathBuf = {
-        let mut js_path = RESOURCES_DIR.clone();
-        js_path.push("script.js");
-        js_path
-    };
-    static ref CSS_PATH: PathBuf = {
-        let mut css_path = RESOURCES_DIR.clone();
-        css_path.push("style.css");
-        css_path
+    static ref INDEX_PATH: PathBuf = {
+        let mut index_path = PathBuf::new();
+        index_path.push(get_env!("CARGO_MANIFEST_DIR"));
+        index_path.push("resources");
+        index_path.push("index.html");
+        index_path
     };
 }
 
 #[cfg(not(feature = "dev"))]
-lazy_static! {
-    static ref INDEX_CONTENTS: String = {
-        let html = include_str!("../resources/index.html");
-        let js = include_str!("../resources/script.js");
-        let css = include_str!("../resources/style.css");
-
-        html.replace("{{ js }}", js).replace("{{ css }}", css)
-    };
-}
+static INDEX_CONTENTS: &str = include_str!("../resources/index.html");
 
 static HIGHLIGHT_CONTENTS: &str = include_str!("../resources/highlight.html");
 const HIGHLIGHT_LANGUAGE: &str = r#"<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/languages/{{ language }}.min.js"></script>"#;
@@ -269,15 +247,11 @@ pub async fn index(
     let contents = {
         #[cfg(feature = "dev")]
         {
-            let html = fs::read_to_string(&*HTML_PATH).expect("Can't read index.html");
-            let js = fs::read_to_string(&*JS_PATH).expect("Can't read script.js");
-            let css = fs::read_to_string(&*CSS_PATH).expect("Can't read style.css");
-
-            html.replace("{{ js }}", &js).replace("{{ css }}", &css)
+            fs::read_to_string(&*INDEX_PATH).expect("Can't read index.html")
         }
         #[cfg(not(feature = "dev"))]
         {
-            (&*INDEX_CONTENTS).clone()
+            INDEX_CONTENTS.to_owned()
         }
     };
 
@@ -670,7 +644,7 @@ pub mod texts {
         )
     }
 
-    /// PUT a new text entry
+    /// POST a new text entry
     pub async fn post(
         request: HttpRequest,
         body: web::Json<PutPostText>,
