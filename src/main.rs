@@ -33,9 +33,10 @@ pub mod setup;
 pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
 #[cfg(not(feature = "dev"))]
-embed_migrations!("./migrations");
+embed_migrations!();
 
-fn main() {
+#[actix_rt::main]
+async fn main() {
     let config = {
         #[cfg(feature = "dev")]
         {
@@ -75,7 +76,7 @@ fn main() {
     };
 
     let port = config.port;
-    let max_filesize = (config.max_filesize as f64 * 1.37) as usize;
+    let max_filesize_json = (config.max_filesize as f64 * 1.37) as usize;
 
     println!("Listening on port {}", port);
 
@@ -93,29 +94,29 @@ fn main() {
             .route("/", web::get().to(routes::index))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))
-            .route("/f", web::get().to_async(routes::files::gets))
-            .route("/l", web::get().to_async(routes::links::gets))
-            .route("/t", web::get().to_async(routes::texts::gets))
-            .route("/f/{id}", web::get().to_async(routes::files::get))
-            .route("/l/{id}", web::get().to_async(routes::links::get))
-            .route("/t/{id}", web::get().to_async(routes::texts::get))
+            .route("/f", web::get().to(routes::files::gets))
+            .route("/l", web::get().to(routes::links::gets))
+            .route("/t", web::get().to(routes::texts::gets))
+            .route("/f/{id}", web::get().to(routes::files::get))
+            .route("/l/{id}", web::get().to(routes::links::get))
+            .route("/t/{id}", web::get().to(routes::texts::get))
             .service(
                 web::resource("/f/{id}")
                     .data(web::Json::<routes::files::PutFile>::configure(|cfg| {
-                        cfg.limit(max_filesize)
+                        cfg.limit(max_filesize_json)
                     }))
-                    .route(web::put().to_async(routes::files::put))
-                    .route(web::delete().to_async(routes::files::delete)),
+                    .route(web::put().to(routes::files::put))
+                    .route(web::delete().to(routes::files::delete)),
             )
             .service(
                 web::resource("/l/{id}")
-                    .route(web::put().to_async(routes::links::put))
-                    .route(web::delete().to_async(routes::links::delete)),
+                    .route(web::put().to(routes::links::put))
+                    .route(web::delete().to(routes::links::delete)),
             )
             .service(
                 web::resource("/t/{id}")
-                    .route(web::put().to_async(routes::texts::put))
-                    .route(web::delete().to_async(routes::texts::delete)),
+                    .route(web::put().to(routes::texts::put))
+                    .route(web::delete().to(routes::texts::delete)),
             )
     })
     .bind(&format!("localhost:{}", port))
@@ -124,6 +125,7 @@ fn main() {
         process::exit(1);
     })
     .run()
+    .await
     .unwrap_or_else(|e| {
         eprintln!("Can't start webserver: {}.", e);
         process::exit(1);
