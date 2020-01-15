@@ -169,12 +169,33 @@ macro_rules! delete {
 }
 
 /// Verify if an entry exists
-macro_rules! exists {
+macro_rules! random_id {
     ($m:ident) => {
-        pub async fn exists(id: i32, pool: actix_web::web::Data<Pool>) -> bool {
-            match actix_web::web::block(move || crate::queries::$m::find(id, pool)).await {
-                Ok(_) => true,
-                Err(_) => false,
+        use rand::Rng;
+
+        pub async fn random_id(pool: &actix_web::web::Data<Pool>) -> Result<i32, actix_web::Error> {
+            let mut rng = rand::thread_rng();
+            loop {
+                let id = rng.gen();
+                let pool = pool.clone();
+                match actix_web::web::block(move || crate::queries::$m::find(id, pool)).await {
+                    Ok(_) => continue,
+                    Err(e) => match e {
+                        actix_web::error::BlockingError::Error(e) => match e {
+                            diesel::result::Error::NotFound => return Ok(id),
+                            _ => {
+                                return Err(actix_web::HttpResponse::InternalServerError()
+                                    .body("Internal server error")
+                                    .into())
+                            }
+                        },
+                        actix_web::error::BlockingError::Canceled => {
+                            return Err(actix_web::HttpResponse::InternalServerError()
+                                .body("Internal server error")
+                                .into())
+                        }
+                    },
+                }
             }
         }
     };
@@ -294,6 +315,8 @@ pub mod files {
     };
 
     select!(files);
+    delete!(files);
+    random_id!(files);
 
     /// GET a file entry and statically serve it
     pub async fn get(
@@ -413,7 +436,7 @@ pub mod files {
     ) -> Result<HttpResponse, Error> {
         auth(identity, request, &password_hash).await?;
 
-        let id = parse_id(&path)?;
+        let id = random_id(&pool).await?;
         let (mut path, mut relative_path) = setup(&config).await?;
 
         let mut field = match body.next().await {
@@ -476,8 +499,6 @@ pub mod files {
 
         query(id, relative_path, pool).await
     }
-
-    delete!(files);
 }
 
 pub mod links {
