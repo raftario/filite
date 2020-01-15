@@ -79,9 +79,8 @@ async fn auth(
     }
 }
 
-/// Match result from REPLACE queries
-#[inline(always)]
-fn match_replace_result<T: Serialize>(
+/// Match result from REPLACE queries for PUT routes
+fn match_replace_result_put<T: Serialize>(
     result: Result<T, BlockingError<diesel::result::Error>>,
 ) -> Result<HttpResponse, Error> {
     match result {
@@ -92,8 +91,20 @@ fn match_replace_result<T: Serialize>(
     }
 }
 
+/// Match result from REPLACE queries for POST routes
+fn match_replace_result_post<T: Serialize>(
+    result: Result<T, BlockingError<diesel::result::Error>>,
+    id: i32,
+) -> Result<HttpResponse, Error> {
+    match result {
+        Ok(_) => Ok(HttpResponse::Created().body(format!("{}", radix_fmt::radix_36(id)))),
+        Err(_) => Err(HttpResponse::InternalServerError()
+            .body("Internal server error")
+            .into()),
+    }
+}
+
 /// Handles error from single GET queries using find
-#[inline(always)]
 fn match_find_error<T>(error: BlockingError<diesel::result::Error>) -> Result<T, Error> {
     match error {
         BlockingError::Error(e) => match e {
@@ -345,7 +356,7 @@ pub mod files {
         pub filename: String,
     }
 
-    /// Common setup for both routes
+    /// Common setup for both PUT and POST
     async fn setup(config: &Config) -> Result<(PathBuf, PathBuf), Error> {
         let path = config.files_dir.clone();
         let relative_path = PathBuf::new();
@@ -361,24 +372,11 @@ pub mod files {
 
         Ok((path, relative_path))
     }
-    /// Common conversion for both routes
+    /// Common conversion for both PUT and POST
     fn pts(path: &PathBuf) -> Result<String, Error> {
         match path.to_str() {
             Some(rp) => Ok(rp.to_owned()),
             None => Err(HttpResponse::InternalServerError()
-                .body("Internal server error")
-                .into()),
-        }
-    }
-    /// Common database query for both routes
-    async fn query(
-        id: i32,
-        relative_path: String,
-        pool: web::Data<Pool>,
-    ) -> Result<HttpResponse, Error> {
-        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
-            Ok(file) => Ok(HttpResponse::Created().json(file)),
-            Err(_) => Err(HttpResponse::InternalServerError()
                 .body("Internal server error")
                 .into()),
         }
@@ -422,7 +420,12 @@ pub mod files {
                 .into());
         }
 
-        query(id, relative_path, pool).await
+        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
+            Ok(file) => Ok(HttpResponse::Created().json(file)),
+            Err(_) => Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into()),
+        }
     }
 
     /// POST a new file entry using a multipart body
@@ -497,7 +500,12 @@ pub mod files {
             };
         }
 
-        query(id, relative_path, pool).await
+        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
+            Ok(_) => Ok(HttpResponse::Created().body(format!("{}", radix_fmt::radix_36(id)))),
+            Err(_) => Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into()),
+        }
     }
 }
 
@@ -505,7 +513,8 @@ pub mod links {
     use crate::{
         queries::{self, SelectQuery},
         routes::{
-            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+            auth, match_find_error, match_replace_result_post, match_replace_result_put, parse_id,
+            timestamp_to_last_modified,
         },
         Pool,
     };
@@ -513,6 +522,8 @@ pub mod links {
     use actix_web::{web, Error, HttpRequest, HttpResponse};
 
     select!(links);
+    delete!(links);
+    random_id!(links);
 
     /// GET a link entry and redirect to it
     pub async fn get(
@@ -531,7 +542,7 @@ pub mod links {
 
     /// Request body when PUTting links
     #[derive(Deserialize)]
-    pub struct PutLink {
+    pub struct PutPostLink {
         pub forward: String,
     }
 
@@ -539,7 +550,7 @@ pub mod links {
     pub async fn put(
         request: HttpRequest,
         path: web::Path<String>,
-        body: web::Json<PutLink>,
+        body: web::Json<PutPostLink>,
         pool: web::Data<Pool>,
         identity: Identity,
         password_hash: web::Data<Vec<u8>>,
@@ -547,12 +558,27 @@ pub mod links {
         auth(identity, request, &password_hash).await?;
 
         let id = parse_id(&path)?;
-        match_replace_result(
+        match_replace_result_put(
             web::block(move || queries::links::replace(id, &body.forward, pool)).await,
         )
     }
 
-    delete!(links);
+    /// POST a new link entry
+    pub async fn post(
+        request: HttpRequest,
+        body: web::Json<PutPostLink>,
+        pool: web::Data<Pool>,
+        identity: Identity,
+        password_hash: web::Data<Vec<u8>>,
+    ) -> Result<HttpResponse, Error> {
+        auth(identity, request, &password_hash).await?;
+
+        let id = random_id(&pool).await?;
+        match_replace_result_post(
+            web::block(move || queries::links::replace(id, &body.forward, pool)).await,
+            id,
+        )
+    }
 }
 
 pub mod texts {
@@ -560,7 +586,8 @@ pub mod texts {
     use crate::{
         queries::{self, SelectQuery},
         routes::{
-            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
+            auth, match_find_error, match_replace_result_post, match_replace_result_put, parse_id,
+            timestamp_to_last_modified,
         },
         Pool,
     };
@@ -572,6 +599,8 @@ pub mod texts {
     use actix_web::{web, Error, HttpRequest, HttpResponse};
 
     select!(texts);
+    delete!(texts);
+    random_id!(texts);
 
     /// GET a text entry and display it
     pub async fn get(
@@ -630,11 +659,27 @@ pub mod texts {
         auth(identity, request, &password_hash).await?;
 
         let id = parse_id(&path)?;
-        match_replace_result(
+        match_replace_result_put(
             web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
                 .await,
         )
     }
 
-    delete!(texts);
+    /// PUT a new text entry
+    pub async fn post(
+        request: HttpRequest,
+        body: web::Json<PutText>,
+        pool: web::Data<Pool>,
+        identity: Identity,
+        password_hash: web::Data<Vec<u8>>,
+    ) -> Result<HttpResponse, Error> {
+        auth(identity, request, &password_hash).await?;
+
+        let id = random_id(&pool).await?;
+        match_replace_result_post(
+            web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
+                .await,
+            id,
+        )
+    }
 }

@@ -94,27 +94,39 @@ async fn main() {
             .route("/", web::get().to(routes::index))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))
-            .route("/f", web::get().to(routes::files::select))
-            .route("/l", web::get().to(routes::links::select))
-            .route("/t", web::get().to(routes::texts::select))
-            .route("/f/{id}", web::get().to(routes::files::get))
-            .route("/l/{id}", web::get().to(routes::links::get))
-            .route("/t/{id}", web::get().to(routes::texts::get))
+            .service(
+                web::resource("/f")
+                    .route(web::get().to(routes::files::select))
+                    .route(web::post().to(routes::files::post)),
+            )
+            .service(
+                web::resource("/l")
+                    .route(web::get().to(routes::links::select))
+                    .route(web::post().to(routes::links::post)),
+            )
+            .service(
+                web::resource("/t")
+                    .route(web::get().to(routes::texts::select))
+                    .route(web::post().to(routes::texts::post)),
+            )
             .service(
                 web::resource("/f/{id}")
                     .data(web::Json::<routes::files::PutFile>::configure(|cfg| {
                         cfg.limit(max_filesize_json)
                     }))
+                    .route(web::get().to(routes::files::get))
                     .route(web::put().to(routes::files::put))
                     .route(web::delete().to(routes::files::delete)),
             )
             .service(
                 web::resource("/l/{id}")
+                    .route(web::get().to(routes::links::get))
                     .route(web::put().to(routes::links::put))
                     .route(web::delete().to(routes::links::delete)),
             )
             .service(
                 web::resource("/t/{id}")
+                    .route(web::get().to(routes::texts::get))
                     .route(web::put().to(routes::texts::put))
                     .route(web::delete().to(routes::texts::delete)),
             )
