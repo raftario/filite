@@ -19,6 +19,7 @@ table! {
         id -> Integer,
         contents -> Text,
         created -> Integer,
+        highlight -> Bool,
     }
 }
 

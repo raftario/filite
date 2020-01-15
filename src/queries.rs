@@ -175,11 +175,17 @@ pub mod texts {
     find!(texts, Text);
 
     /// REPLACE a text entry
-    pub fn replace(r_id: i32, r_contents: &str, pool: Data<Pool>) -> QueryResult<Text> {
+    pub fn replace(
+        r_id: i32,
+        r_contents: &str,
+        r_highlight: bool,
+        pool: Data<Pool>,
+    ) -> QueryResult<Text> {
         let conn: &SqliteConnection = &pool.get().unwrap();
         let new_text = NewText {
             id: r_id,
             contents: r_contents,
+            highlight: r_highlight,
         };
         diesel::replace_into(table)
             .values(&new_text)

@@ -65,6 +65,8 @@ pub mod texts {
         pub contents: String,
         /// Creation date and time as a UNIX timestamp
         pub created: i32,
+        /// Whether to enable code highlighting or not for that text
+        pub highlight: bool,
     }
 
     /// A new entry to the `texts` table
@@ -75,5 +77,7 @@ pub mod texts {
         pub id: i32,
         /// Text contents
         pub contents: &'a str,
+        /// Whether to enable code highlighting or not for that text
+        pub highlight: bool,
     }
 }

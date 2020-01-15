@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{{ title }}</title>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/{{ theme }}.min.css"
+        />
+        <style>
+            html,
+            body {
+                overflow: hidden;
+            }
+            html,
+            body,
+            pre {
+                margin: 0;
+                padding: 0;
+            }
+            code {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                max-width: 100%;
+                max-height: 100%;
+                font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo,
+                    monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <pre><code>{{ contents }}</code></pre>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/highlight.min.js"
+            integrity="sha256-1zu+3BnLYV9LdiY85uXMzii3bdrkelyp37e0ZyTAQh0="
+            crossorigin="anonymous"
+        ></script>
+        {{ languages }}
+        <script>
+            hljs.initHighlightingOnLoad();
+        </script>
+    </body>
+</html>

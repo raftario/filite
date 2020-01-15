@@ -116,6 +116,13 @@ fn timestamp_to_last_modified(timestamp: i32) -> String {
     datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
+/// Escapes text to be inserted in a HTML element
+fn escape_html(text: &str) -> String {
+    text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+}
+
 /// GET multiple entries
 macro_rules! select {
     ($m:ident) => {
@@ -195,6 +202,9 @@ lazy_static! {
         html.replace("{{ js }}", js).replace("{{ css }}", css)
     };
 }
+
+static HIGHLIGHT_CONTENTS: &str = include_str!("../resources/highlight.html");
+const HIGHLIGHT_LANGUAGE: &str = r#"<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/languages/{{ language }}.min.js"></script>"#;
 
 /// Index page letting users upload via a UI
 pub async fn index(
@@ -406,12 +416,17 @@ pub mod links {
 }
 
 pub mod texts {
+    use crate::routes::escape_html;
     use crate::{
         queries::{self, SelectQuery},
         routes::{
             auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
         },
         Pool,
+    };
+    use crate::{
+        routes::{HIGHLIGHT_CONTENTS, HIGHLIGHT_LANGUAGE},
+        setup::Config,
     };
     use actix_identity::Identity;
     use actix_web::{web, Error, HttpRequest, HttpResponse};
@@ -420,14 +435,38 @@ pub mod texts {
 
     /// GET a text entry and display it
     pub async fn get(
+        config: web::Data<Config>,
         path: web::Path<String>,
         pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
         let id = parse_id(&path)?;
         match web::block(move || queries::texts::find(id, pool)).await {
-            Ok(text) => Ok(HttpResponse::Ok()
-                .header("Last-Modified", timestamp_to_last_modified(text.created))
-                .body(text.contents)),
+            Ok(text) => {
+                let last_modified = timestamp_to_last_modified(text.created);
+                if text.highlight {
+                    let languages: Vec<String> = config
+                        .highlight
+                        .languages
+                        .iter()
+                        .map(|l| HIGHLIGHT_LANGUAGE.replace("{{ language }}", l))
+                        .collect();
+                    let languages = languages.join("\n");
+                    let contents = HIGHLIGHT_CONTENTS
+                        .replace("{{ title }}", &path)
+                        .replace("{{ theme }}", &config.highlight.theme)
+                        .replace("{{ contents }}", &escape_html(&text.contents))
+                        .replace("{{ languages }}", &languages);
+
+                    Ok(HttpResponse::Ok()
+                        .header("Last-Modified", last_modified)
+                        .header("Content-Type", "text/html")
+                        .body(contents))
+                } else {
+                    Ok(HttpResponse::Ok()
+                        .header("Last-Modified", last_modified)
+                        .body(text.contents))
+                }
+            }
             Err(e) => match_find_error(e),
         }
     }
@@ -436,6 +475,7 @@ pub mod texts {
     #[derive(Deserialize)]
     pub struct PutText {
         pub contents: String,
+        pub highlight: bool,
     }
 
     /// PUT a new text entry
@@ -451,7 +491,8 @@ pub mod texts {
 
         let id = parse_id(&path)?;
         match_replace_result(
-            web::block(move || queries::texts::replace(id, &body.contents, pool)).await,
+            web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
+                .await,
         )
     }
 

@@ -88,6 +88,17 @@ pub struct Config {
     pub files_dir: PathBuf,
     /// Maximum allowed file size
     pub max_filesize: usize,
+    /// Highlight.js configuration
+    pub highlight: HighlightConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(not(feature = "dev"), serde(default))]
+pub struct HighlightConfig {
+    /// Theme to use
+    pub theme: String,
+    /// Additional languages to include
+    pub languages: Vec<String>,
 }
 
 #[cfg(not(feature = "dev"))]
@@ -104,12 +115,22 @@ impl Default for Config {
         let files_dir = get_data_dir().join("files");
         let max_filesize = 10_000_000;
 
-        Config {
+        Self {
             port,
             database_url,
             pool_size,
             files_dir,
             max_filesize,
+            highlight: HighlightConfig::default(),
+        }
+    }
+}
+
+impl Default for HighlightConfig {
+    fn default() -> Self {
+        Self {
+            theme: "github".to_owned(),
+            languages: vec!["rust".to_owned()],
         }
     }
 }
@@ -192,12 +213,13 @@ impl Config {
         };
         let max_filesize = parse_env!("MAX_FILESIZE");
 
-        Config {
+        Self {
             port,
             database_url,
             pool_size,
             files_dir,
             max_filesize,
+            highlight: HighlightConfig::default(),
         }
     }
 }

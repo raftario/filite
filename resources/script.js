@@ -231,7 +231,7 @@ for (const group in inputs) {
             fetch(url, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents }),
+                body: JSON.stringify({ contents, highlight: true }),
             })
                 .then((response) => {
                     status = response.status;
