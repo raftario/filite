@@ -22,6 +22,7 @@ fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     }
 }
 
+/// Authenticates a user
 async fn auth(
     identity: Identity,
     request: HttpRequest,
@@ -126,7 +127,7 @@ fn escape_html(text: &str) -> String {
 /// GET multiple entries
 macro_rules! select {
     ($m:ident) => {
-        pub async fn gets(
+        pub async fn select(
             request: HttpRequest,
             query: actix_web::web::Query<SelectQuery>,
             pool: actix_web::web::Data<Pool>,
@@ -162,6 +163,18 @@ macro_rules! delete {
             match actix_web::web::block(move || crate::queries::$m::delete(id, pool)).await {
                 Ok(()) => Ok(actix_web::HttpResponse::NoContent().body("Deleted")),
                 Err(e) => crate::routes::match_find_error(e),
+            }
+        }
+    };
+}
+
+/// Verify if an entry exists
+macro_rules! exists {
+    ($m:ident) => {
+        pub async fn exists(id: i32, pool: actix_web::web::Data<Pool>) -> bool {
+            match actix_web::web::block(move || crate::queries::$m::find(id, pool)).await {
+                Ok(_) => true,
+                Err(_) => false,
             }
         }
     };
@@ -270,9 +283,15 @@ pub mod files {
     };
     use actix_files::NamedFile;
     use actix_identity::Identity;
-    use actix_web::{error::BlockingError, http, web, Error, HttpRequest, HttpResponse};
+    use actix_multipart::Multipart;
+    use actix_web::{web, Error, HttpRequest, HttpResponse};
     use chrono::Utc;
-    use std::{fs, path::PathBuf};
+    use futures::StreamExt;
+    use std::{
+        fs::{self, File},
+        io::Write,
+        path::PathBuf,
+    };
 
     select!(files);
 
@@ -303,6 +322,45 @@ pub mod files {
         pub filename: String,
     }
 
+    /// Common setup for both routes
+    async fn setup(config: &Config) -> Result<(PathBuf, PathBuf), Error> {
+        let path = config.files_dir.clone();
+        let relative_path = PathBuf::new();
+        let dir_path = path.clone();
+        if web::block(move || fs::create_dir_all(dir_path))
+            .await
+            .is_err()
+        {
+            return Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into());
+        }
+
+        Ok((path, relative_path))
+    }
+    /// Common conversion for both routes
+    fn pts(path: &PathBuf) -> Result<String, Error> {
+        match path.to_str() {
+            Some(rp) => Ok(rp.to_owned()),
+            None => Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into()),
+        }
+    }
+    /// Common database query for both routes
+    async fn query(
+        id: i32,
+        relative_path: String,
+        pool: web::Data<Pool>,
+    ) -> Result<HttpResponse, Error> {
+        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
+            Ok(file) => Ok(HttpResponse::Created().json(file)),
+            Err(_) => Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into()),
+        }
+    }
+
     /// PUT a new file entry
     pub async fn put(
         request: HttpRequest,
@@ -316,46 +374,107 @@ pub mod files {
         auth(identity, request, &password_hash).await?;
 
         let id = parse_id(&path)?;
-        let result = web::block(move || {
-            let mut path = config.files_dir.clone();
-            let mut relative_path = PathBuf::new();
-            if fs::create_dir_all(&path).is_err() {
-                return Err(http::StatusCode::from_u16(500).unwrap());
+        let (mut path, mut relative_path) = setup(&config).await?;
+
+        let mut filename = body.filename.clone();
+        filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
+        path.push(&filename);
+        relative_path.push(&filename);
+        let relative_path = pts(&relative_path)?;
+
+        let contents = match web::block(move || base64::decode(&body.base64)).await {
+            Ok(contents) => contents,
+            Err(_) => {
+                return Err(HttpResponse::BadRequest()
+                    .body("Invalid base64 encoded file")
+                    .into())
             }
-
-            let mut filename = body.filename.clone();
-            filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
-            path.push(&filename);
-            relative_path.push(&filename);
-
-            let relative_path = match relative_path.to_str() {
-                Some(rp) => rp,
-                None => return Err(http::StatusCode::from_u16(500).unwrap()),
-            };
-
-            let contents = match base64::decode(&body.base64) {
-                Ok(contents) => contents,
-                Err(_) => return Err(http::StatusCode::from_u16(400).unwrap()),
-            };
-            if fs::write(&path, contents).is_err() {
-                return Err(http::StatusCode::from_u16(500).unwrap());
-            }
-
-            match queries::files::replace(id, relative_path, pool) {
-                Ok(file) => Ok(file),
-                Err(_) => Err(http::StatusCode::from_u16(500).unwrap()),
-            }
-        })
-        .await;
-        match result {
-            Ok(file) => Ok(HttpResponse::Created().json(file)),
-            Err(e) => match e {
-                BlockingError::Error(sc) => Err(HttpResponse::new(sc).into()),
-                BlockingError::Canceled => Err(HttpResponse::InternalServerError()
-                    .body("Internal server error")
-                    .into()),
-            },
+        };
+        if web::block(move || fs::write(&path, contents))
+            .await
+            .is_err()
+        {
+            return Err(HttpResponse::InternalServerError()
+                .body("Internal server error")
+                .into());
         }
+
+        query(id, relative_path, pool).await
+    }
+
+    /// POST a new file entry using a multipart body
+    pub async fn post(
+        request: HttpRequest,
+        mut body: Multipart,
+        pool: web::Data<Pool>,
+        config: web::Data<Config>,
+        identity: Identity,
+        password_hash: web::Data<Vec<u8>>,
+    ) -> Result<HttpResponse, Error> {
+        auth(identity, request, &password_hash).await?;
+
+        let id = parse_id(&path)?;
+        let (mut path, mut relative_path) = setup(&config).await?;
+
+        let mut field = match body.next().await {
+            Some(f) => f?,
+            None => {
+                return Err(HttpResponse::BadRequest()
+                    .body("Empty multipart body")
+                    .into())
+            }
+        };
+        let content_disposition = match field.content_disposition() {
+            Some(cd) => cd,
+            None => {
+                return Err(HttpResponse::BadRequest()
+                    .body("Missing content disposition")
+                    .into())
+            }
+        };
+        let filename = match content_disposition.get_filename() {
+            Some(n) => n,
+            None => return Err(HttpResponse::BadRequest().body("Missing filename").into()),
+        };
+        let filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
+        path.push(&filename);
+        relative_path.push(&filename);
+        let relative_path = pts(&relative_path)?;
+
+        let mut f = match web::block(move || File::create(&path)).await {
+            Ok(f) => f,
+            Err(_) => {
+                return Err(HttpResponse::InternalServerError()
+                    .body("Internal server error")
+                    .into())
+            }
+        };
+        while let Some(chunk) = field.next().await {
+            let data = match chunk {
+                Ok(c) => c,
+                Err(_) => {
+                    return Err(HttpResponse::BadRequest()
+                        .body("Invalid multipart data")
+                        .into())
+                }
+            };
+
+            f = match web::block(move || match f.write_all(&data) {
+                Ok(_) => Ok(f),
+                Err(_) => Err(()),
+            })
+            .await
+            {
+                Ok(f) => f,
+                Err(_) => {
+                    return Err(HttpResponse::InternalServerError()
+                        .body("Internal server error")
+                        .into())
+                }
+            };
+        }
+
+        query(id, relative_path, pool).await
     }
 
     delete!(files);
