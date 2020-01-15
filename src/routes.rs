@@ -22,6 +22,10 @@ fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     }
 }
 
+lazy_static! {
+    static ref EMPTY_HASH: Vec<u8> = setup::hash("");
+}
+
 /// Authenticates a user
 async fn auth(
     identity: Identity,
@@ -32,7 +36,7 @@ async fn auth(
         return Ok(());
     }
 
-    if password_hash == setup::hash("").as_slice() {
+    if password_hash == (&*EMPTY_HASH).as_slice() {
         identity.remember("guest".into());
         return Ok(());
     }
