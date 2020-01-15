@@ -186,12 +186,13 @@ macro_rules! delete {
 /// Verify if an entry exists
 macro_rules! random_id {
     ($m:ident) => {
-        use rand::Rng;
+        use rand::distributions::Distribution;
 
         pub async fn random_id(pool: &actix_web::web::Data<Pool>) -> Result<i32, actix_web::Error> {
             let mut rng = rand::thread_rng();
+            let distribution = rand::distributions::Uniform::from(0..i32::max_value());
             loop {
-                let id = rng.gen();
+                let id = distribution.sample(&mut rng);
                 let pool = pool.clone();
                 match actix_web::web::block(move || crate::queries::$m::find(id, pool)).await {
                     Ok(_) => continue,
@@ -646,7 +647,7 @@ pub mod texts {
 
     /// Request body when PUTting texts
     #[derive(Deserialize)]
-    pub struct PutText {
+    pub struct PutPostText {
         pub contents: String,
         pub highlight: bool,
     }
@@ -655,7 +656,7 @@ pub mod texts {
     pub async fn put(
         request: HttpRequest,
         path: web::Path<String>,
-        body: web::Json<PutText>,
+        body: web::Json<PutPostText>,
         pool: web::Data<Pool>,
         identity: Identity,
         password_hash: web::Data<Vec<u8>>,
@@ -672,7 +673,7 @@ pub mod texts {
     /// PUT a new text entry
     pub async fn post(
         request: HttpRequest,
-        body: web::Json<PutText>,
+        body: web::Json<PutPostText>,
         pool: web::Data<Pool>,
         identity: Identity,
         password_hash: web::Data<Vec<u8>>,
