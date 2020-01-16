@@ -1,6 +1,6 @@
 [package]
 name = "filite"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
 description = "A simple, light and standalone pastebin, URL shortener and file-sharing service"

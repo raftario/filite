@@ -19,9 +19,7 @@ pub mod files {
     #[derive(Insertable)]
     #[table_name = "files"]
     pub struct NewFile<'a> {
-        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
-        /// Path to the file to serve relative to the static files root
         pub filepath: &'a str,
     }
 }
@@ -45,9 +43,7 @@ pub mod links {
     #[derive(Insertable)]
     #[table_name = "links"]
     pub struct NewLink<'a> {
-        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
-        /// URL this link forwards to
         pub forward: &'a str,
     }
 }
@@ -73,11 +69,8 @@ pub mod texts {
     #[derive(Insertable)]
     #[table_name = "texts"]
     pub struct NewText<'a> {
-        /// Primary key, its radix 36 value is used as an url
         pub id: i32,
-        /// Text contents
         pub contents: &'a str,
-        /// Whether to enable code highlighting or not for that text
         pub highlight: bool,
     }
 }

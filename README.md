@@ -5,6 +5,39 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 [![GitHub Actions](https://github.com/raftario/filite/workflows/Build/badge.svg)](https://github.com/raftario/filite/actions?workflowID=Build)
 [![Crates.io](https://img.shields.io/crates/v/filite.svg)](https://crates.io/crates/filite)
 
+[Live Example](https://filite.raphaeltheriault.com)
+
+## Table of Contents
+
+- [filite](#filite)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+    - [What it is](#what-it-is)
+    - [What it is not](#what-it-is-not)
+  - [Installation](#installation)
+  - [Usage](#usage)
+  - [Planned features](#planned-features)
+  - [Config](#config)
+  - [Client tools](#client-tools)
+    - [ShareX](#sharex)
+      - [File](#file)
+      - [Link](#link)
+      - [Text](#text)
+  - [Reverse proxy](#reverse-proxy)
+    - [NGINX](#nginx)
+    - [Apache](#apache)
+  - [Programmatic usage](#programmatic-usage)
+    - [Listing existing entries](#listing-existing-entries)
+    - [Creating new entries](#creating-new-entries)
+      - [Files](#files)
+      - [Links](#links)
+      - [Texts](#texts)
+    - [Deleting entries](#deleting-entries)
+  - [Contributing](#contributing)
+    - [Requirements](#requirements)
+    - [Setup](#setup)
+  - [License](#license)
+
 ## Features
 
 ### What it is
@@ -15,24 +48,20 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 
 ### What it is not
 
-* A tracking tool. No stats are stored to increase speed and reduce resource usage, if this is what you are looking for this tool is not for you.
+* A tracking tool. No stats are stored to increase speed, reduce resource usage and maintain simplicity, if this is what you are looking for filite is not for you.
 
 ## Installation
 
 1. Get the binary either from the [releases page](https://github.com/raftario/filite/releases) or [using Cargo](https://crates.io/crates/filite)
-2. Run it a first time and follow the instructions
-3. Edit your config file, check the [dedicated section](#config) for details
-4. Run the binary again and you're good to go, just browse to http://localhost:8080 (don't forget to replace `8080` with the port specified in your config)
-5. Optionally, set up a [reverse proxy](#reverse-proxy)
+2. Run `filite init` to perform the initial setup (you can do this at any time to reset the config and password)
+3. Edit your config file as you see fit (check the [dedicated section](#config) for details)
+4. Run `filite`
+
+That's it!
 
 ## Usage
 
-When asked for a login, use whatever username you want and the password you provided during setup. Usage is pretty straightforward using the web UI, but here are some tips.
-
-* On successful submission, the URL will be copied to clipboard. If copying to clipboard fails, it will be displayed as an alert.
-* Press space in the URL input to generate a random one
-* If the entered URL is already in use, the input will have a yellow outline
-
+When asked for a login, use whatever username you want and the password you provided during setup.
 Details for programmatic usage are provided in [the dedicated section](#programmatic-usage).
 
 ## Planned features
@@ -40,27 +69,25 @@ Details for programmatic usage are provided in [the dedicated section](#programm
 * Decent test suite
 * TLS support
 * Simple admin page
-* systemd service generation
+* Multiple logins (?)
 
 ## Config
-
-The config follows the following format. Most of the time, the defaults are reasonable.
 
 ```toml
 # Port to listen on
 port = 8080
-# SQLite database URL
+# SQLite database connection url
 database_url = "database.db"
-# Database connection pool size
+# SQLite database connection pool size
 pool_size = 4
-# Path to the directory where files will be stored, relative or absolute
+# Directory where to store static files
 files_dir = "files"
 
 # Highlight.js configuration
 [highlight]
 # Theme to use
 theme = "github"
-# Additional languages to import
+# Additional languages to include
 languages = ["rust"]
 ```
 
@@ -68,8 +95,10 @@ languages = ["rust"]
 
 ### ShareX
 
-> To get the value of `AUTORIZATION` convert `<USERNAME>:<PASSWORD>` to base64.
-> Don't forget to replace `http://example.com` with your own address.
+- `<AUTHORIZATION>` is the result of encoding `<USERNAME>:<PASSWORD>` to base64
+  - `<USERNAME>` is an arbitrary username, it doesn't matter
+  - `<PASSWORD>` is the password entered during setup
+- `<ADDRESS>` is the root address where the filite is running, for instance `http://localhost:8080` or `https://filite.raphaeltheriault.com`
 
 #### File
 
@@ -79,13 +108,13 @@ languages = ["rust"]
   "Name": "filite (file)",
   "DestinationType": "ImageUploader, FileUploader",
   "RequestMethod": "POST",
-  "RequestURL": "http://example.com/f",
+  "RequestURL": "<ADDRESS>/f",
   "Headers": {
     "Authorization": "Basic <AUTORIZATION>"
   },
   "Body": "MultipartFormData",
   "FileFormName": "file",
-  "URL": "http://example.com/f/$response$"
+  "URL": "<ADDRESS>/$response$"
 }
 ```
 
@@ -97,19 +126,19 @@ languages = ["rust"]
   "Name": "filite (link)",
   "DestinationType": "URLShortener",
   "RequestMethod": "POST",
-  "RequestURL": "http://example.com/l",
+  "RequestURL": "<ADDRESS>/l",
   "Headers": {
     "Authorization": "Basic <AUTORIZATION>"
   },
   "Body": "JSON",
   "Data": "{\"forward\":\"$input$\"}",
-  "URL": "http://example.com/l/$response$"
+  "URL": "<ADDRESS>/l/$response$"
 }
 ```
 
 #### Text
 
-> You can remove the prompt and always enable syntax highlighting by replacing `$prompt:Highlight|false$` with `true` or `false`.
+> You can remove the prompt and always enable or disable syntax highlighting by replacing `$prompt:Highlight|false$` with `true` or `false`.
 
 ```json
 {
@@ -117,121 +146,138 @@ languages = ["rust"]
   "Name": "filite (text)",
   "DestinationType": "TextUploader",
   "RequestMethod": "POST",
-  "RequestURL": "http://example.com/t",
+  "RequestURL": "<ADDRESS>/t",
   "Headers": {
     "Authorization": "Basic <AUTORIZATION>"
   },
   "Body": "JSON",
   "Data": "{\"contents\":\"$input$\",\"highlight\":$prompt:Highlight|false$}",
-  "URL": "http://example.com/t/$response$"
+  "URL": "<ADDRESS>/t/$response$"
 }
 ```
 
 ## Reverse proxy
 
-### NGINX
+- `<DOMAIN>` is the domain the requests will be coming from, for instance `filite.raphaeltheriault.com`
+- `<PORT>` is the port on which filite is listening
 
-> Don't forget to replace `8080` with the port specified in your config and `example.com` with your own domain.
+> Upload limits are set to 10M as an example
+
+### NGINX
 
 ```nginx
 server {
-    listen 80;
-    listen [::]:80;
+  listen 80;
+  listen [::]:80;
 
-    server_name example.com;
+  server_name <DOMAIN>;
 
-    location / {
-        proxy_pass http://localhost:8080;
-        
-        location /f {
-            client_max_body_size 10M;
-        }
+  location / {
+    proxy_pass http://localhost:<PORT>;
+
+    location /f {
+      client_max_body_size 10M;
     }
+  }
 }
+```
+
+### Apache
+
+```apache
+<VirtualHost *:80>
+  ServerName <DOMAIN>
+
+  ProxyPreserveHost On
+  ProxyPass / http://localhost:<PORT>/
+  ProxyPassReverse / http://localhost:<PORT>/
+
+  <Location "/f">
+    LimitRequestBody 10000000
+  </Location>
+</VirtualHost>
 ```
 
 ## Programmatic usage
 
-### Posting new elements
+> All requests that require authentication use HTTP Basic Auth (without taking the username into account).
 
-Send a PUT request with a JSON body following the following schemes. Don't forget to set the `Content-Type` header to `application/json` and the `Authorization` header to a valid value (username isn't important).
+### Listing existing entries
 
-#### File
+It's possible to get an array of all existing entries for each type with an authenticated request.
 
-`PUT /f/id`
+- `GET /f`
+- `GET /l`
+- `GET /t`
 
-```json
-{
-    "base64": "Base64-encoded file",
-    "filename": "Filename"
-}
-```
+### Creating new entries
 
-#### Link
+There are two ways to create new entries, `PUT` or `POST` requests.
+`PUT` lets you choose the ID manually and `POST` assigns a free one automatically, but that's the only difference.
+Both methods require authentication.
 
-`PUT /l/id`
-
-```json
-{
-    "forward": "URL to forward to"
-}
-```
-
-#### Text
-
-`PUT /t/id`
-
-```json
-{
-    "contents": "Text contents"
-}
-```
-
-### Getting existing elements
-
-The response will be a JSON array following the following schemes
+> `PUT` requests will overwrite any existing entry.
 
 #### Files
 
-`GET /f`
+- `PUT /f/{id}`
+- `POST /f`
 
-```json
-[
-    {
-        "id": "ID (URL) as an integer",
-        "filepath": "Absolute path to the stored file",
-        "created": "Creation timestamp"
-    }
-]
-```
+Files are sent as `multipart/form-data`. The field name isn't important but the file name needs to be included. Only one file is treated.
 
 #### Links
 
-`GET /l`
+- `PUT /l/{id}`
+- `POST /l`
+
+Links are sent as `application/json` according to the following schema.
 
 ```json
-[
-    {
-        "id": "ID (URL) as an integer",
-        "forward": "URL to forward to",
-        "created": "Creation timestamp"
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Link",
+  "type": "object",
+  "properties": {
+    "forward": {
+      "description": "URL this link forwards to",
+      "type": "string"
     }
-]
+  }
+}
 ```
 
 #### Texts
 
-`GET /t`
+- `PUT /t/{id}`
+- `POST /t`
+
+Texts are sent as `application/json` according to the following schema.
 
 ```json
-[
-    {
-        "id": "ID (URL) as an integer",
-        "contents": "Text contents",
-        "created": "Creation timestamp"
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Text",
+  "type": "object",
+  "properties": {
+    "contents": {
+      "description": "Text contents",
+      "type": "string"
+    },
+    "highlight": {
+      "description": "Whether to enable code highlighting or not for that text",
+      "type": "boolean"
     }
-]
+  }
+}
 ```
+
+### Deleting entries
+
+It's possible to delete any entry with an authenticated request.
+
+- `DELETE /f`
+- `DELETE /l`
+- `DELETE /t`
 
 ## Contributing
 
