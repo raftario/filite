@@ -154,7 +154,7 @@ macro_rules! delete {
 
             let id = crate::routes::parse_id(&path)?;
             match actix_web::web::block(move || crate::queries::$m::delete(id)).await {
-                Ok(()) => Ok(actix_web::HttpResponse::NoContent().body("Deleted")),
+                Ok(()) => Ok(actix_web::HttpResponse::Ok().body("Deleted")),
                 Err(e) => crate::routes::match_find_error(e),
             }
         }

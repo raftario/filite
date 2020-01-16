@@ -77,15 +77,18 @@ macro_rules! delete {
 /// Queries affecting the `files` table
 pub mod files {
     use crate::{
-        globals::POOL,
+        globals::{CONFIG, POOL},
         models::files::*,
         queries::SelectFilters,
         schema::files::{dsl::*, table},
     };
-    use diesel::{prelude::*, result::QueryResult};
+    use diesel::{
+        prelude::*,
+        result::{DatabaseErrorKind, Error, QueryResult},
+    };
+    use std::fs;
 
     find!(files, File);
-    delete!(files);
 
     /// SELECT multiple file entries
     pub fn select(filters: SelectFilters) -> QueryResult<Vec<File>> {
@@ -95,8 +98,34 @@ pub mod files {
         query.load::<File>(conn)
     }
 
+    /// Delete an existing file on disk
+    fn fs_del(fid: i32) -> QueryResult<()> {
+        let mut path = CONFIG.files_dir.clone();
+        path.push(match find(fid) {
+            Ok(f) => f.filepath,
+            Err(e) => {
+                return match e {
+                    Error::NotFound => Ok(()),
+                    _ => Err(e),
+                }
+            }
+        });
+        if !path.exists() {
+            return Ok(());
+        }
+
+        fs::remove_file(path).map_err(|e| {
+            Error::DatabaseError(
+                DatabaseErrorKind::UnableToSendCommand,
+                Box::new(format!("{}", e)),
+            )
+        })
+    }
+
     /// REPLACE a file entry
     pub fn replace(r_id: i32, r_filepath: &str) -> QueryResult<File> {
+        fs_del(r_id)?;
+
         let conn: &SqliteConnection = &POOL.get().unwrap();
         let new_file = NewFile {
             id: r_id,
@@ -106,6 +135,15 @@ pub mod files {
             .values(&new_file)
             .execute(conn)?;
         find(r_id)
+    }
+
+    /// DELETE an entry
+    pub fn delete(d_id: i32) -> QueryResult<()> {
+        fs_del(d_id)?;
+
+        let conn: &SqliteConnection = &POOL.get().unwrap();
+        diesel::delete(files.find(d_id)).execute(conn)?;
+        Ok(())
     }
 }
 
