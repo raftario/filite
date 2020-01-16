@@ -13,6 +13,7 @@ keywords = [
     "pastebin"
 ]
 license = "MIT"
+build = "build.rs"
 
 [dependencies]
 actix-files = "0.2.1"
@@ -21,7 +22,7 @@ actix-rt = "1.0.0"
 actix-multipart = "0.2.0"
 actix-web = "2.0.0"
 base64 = "0.11.0"
-blake2 = "0.8.1"
+blake3 = "0.1.1"
 chrono = "0.4.10"
 diesel_migrations = "1.4.0"
 dirs = "2.0.2"
@@ -42,6 +43,9 @@ features = ["bundled"]
 [dependencies.serde]
 version = "1.0.104"
 features = ["derive"]
+
+[build-dependencies]
+rand = "0.7.3"
 
 [features]
 default = []

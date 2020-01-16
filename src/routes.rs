@@ -1,9 +1,11 @@
 //! Actix route handlers
 
-use crate::setup::{self, Config};
+use crate::{
+    globals::{CONFIG, EMPTY_HASH, PASSWORD_HASH},
+    setup,
+};
 use actix_identity::Identity;
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse, Responder};
-use base64;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel;
 use serde::Serialize;
@@ -22,21 +24,13 @@ fn parse_id(id: &str) -> Result<i32, HttpResponse> {
     }
 }
 
-lazy_static! {
-    static ref EMPTY_HASH: Vec<u8> = setup::hash("");
-}
-
 /// Authenticates a user
-async fn auth(
-    identity: Identity,
-    request: HttpRequest,
-    password_hash: &[u8],
-) -> Result<(), HttpResponse> {
+async fn auth(identity: Identity, request: HttpRequest) -> Result<(), HttpResponse> {
     if identity.identity().is_some() {
         return Ok(());
     }
 
-    if password_hash == (&*EMPTY_HASH).as_slice() {
+    if *PASSWORD_HASH == *EMPTY_HASH {
         identity.remember("guest".into());
         return Ok(());
     }
@@ -67,8 +61,8 @@ async fn auth(
         Err(_) => return Err(HttpResponse::BadRequest().body("Invalid Authorization header")),
     };
 
-    let infallible_hash = move || -> Result<Vec<u8>, Infallible> { Ok(setup::hash(password)) };
-    if web::block(infallible_hash).await.unwrap().as_slice() == password_hash {
+    let infallible_hash = move || -> Result<Vec<u8>, Infallible> { Ok(setup::hash(&password)) };
+    if web::block(infallible_hash).await.unwrap() == *PASSWORD_HASH {
         match String::from_utf8(user.to_vec()) {
             Ok(u) => {
                 identity.remember(u);
@@ -133,14 +127,12 @@ macro_rules! select {
         pub async fn select(
             request: HttpRequest,
             query: actix_web::web::Query<SelectQuery>,
-            pool: actix_web::web::Data<Pool>,
             identity: actix_identity::Identity,
-            password_hash: actix_web::web::Data<Vec<u8>>,
         ) -> Result<actix_web::HttpResponse, actix_web::Error> {
-            crate::routes::auth(identity, request, &password_hash).await?;
+            crate::routes::auth(identity, request).await?;
 
             let filters = crate::queries::SelectFilters::from(query.into_inner());
-            match actix_web::web::block(move || crate::queries::$m::select(filters, pool)).await {
+            match actix_web::web::block(move || crate::queries::$m::select(filters)).await {
                 Ok(x) => Ok(actix_web::HttpResponse::Ok().json(x)),
                 Err(_) => Err(actix_web::HttpResponse::InternalServerError()
                     .body("Internal server error")
@@ -156,14 +148,12 @@ macro_rules! delete {
         pub async fn delete(
             request: HttpRequest,
             path: actix_web::web::Path<String>,
-            pool: actix_web::web::Data<Pool>,
             identity: actix_identity::Identity,
-            password_hash: actix_web::web::Data<Vec<u8>>,
         ) -> Result<actix_web::HttpResponse, actix_web::Error> {
-            crate::routes::auth(identity, request, &password_hash).await?;
+            crate::routes::auth(identity, request).await?;
 
             let id = crate::routes::parse_id(&path)?;
-            match actix_web::web::block(move || crate::queries::$m::delete(id, pool)).await {
+            match actix_web::web::block(move || crate::queries::$m::delete(id)).await {
                 Ok(()) => Ok(actix_web::HttpResponse::NoContent().body("Deleted")),
                 Err(e) => crate::routes::match_find_error(e),
             }
@@ -176,13 +166,12 @@ macro_rules! random_id {
     ($m:ident) => {
         use rand::distributions::Distribution;
 
-        pub async fn random_id(pool: &actix_web::web::Data<Pool>) -> Result<i32, actix_web::Error> {
+        pub async fn random_id() -> Result<i32, actix_web::Error> {
             let mut rng = rand::thread_rng();
             let distribution = rand::distributions::Uniform::from(0..i32::max_value());
             loop {
                 let id = distribution.sample(&mut rng);
-                let pool = pool.clone();
-                match actix_web::web::block(move || crate::queries::$m::find(id, pool)).await {
+                match actix_web::web::block(move || crate::queries::$m::find(id)).await {
                     Ok(_) => continue,
                     Err(e) => match e {
                         actix_web::error::BlockingError::Error(e) => match e {
@@ -223,12 +212,8 @@ static HIGHLIGHT_CONTENTS: &str = include_str!("../resources/highlight.html");
 const HIGHLIGHT_LANGUAGE: &str = r#"<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/languages/{{ language }}.min.js"></script>"#;
 
 /// Index page letting users upload via a UI
-pub async fn index(
-    request: HttpRequest,
-    identity: Identity,
-    password_hash: web::Data<Vec<u8>>,
-) -> impl Responder {
-    if let Err(response) = auth(identity, request, &password_hash).await {
+pub async fn index(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
         return response;
     }
 
@@ -242,21 +227,15 @@ pub async fn index(
             INDEX_CONTENTS.to_owned()
         }
     };
-
     HttpResponse::Ok()
         .header("Content-Type", "text/html")
         .body(contents)
 }
 
 /// GET the config info
-pub async fn get_config(
-    request: HttpRequest,
-    config: web::Data<Config>,
-    identity: Identity,
-    password_hash: web::Data<Vec<u8>>,
-) -> impl Responder {
-    match auth(identity, request, &password_hash).await {
-        Ok(_) => HttpResponse::Ok().json(config.get_ref()),
+pub async fn get_config(request: HttpRequest, identity: Identity) -> impl Responder {
+    match auth(identity, request).await {
+        Ok(_) => HttpResponse::Ok().json(&*CONFIG),
         Err(response) => response,
     }
 }
@@ -276,10 +255,9 @@ pub async fn logout(identity: Identity) -> impl Responder {
 pub mod files {
     use crate::routes::match_replace_result;
     use crate::{
+        globals::CONFIG,
         queries::{self, SelectQuery},
         routes::{auth, match_find_error, parse_id},
-        setup::Config,
-        Pool,
     };
     use actix_files::NamedFile;
     use actix_identity::Identity;
@@ -298,15 +276,11 @@ pub mod files {
     random_id!(files);
 
     /// GET a file entry and statically serve it
-    pub async fn get(
-        path: web::Path<String>,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
-    ) -> Result<NamedFile, Error> {
+    pub async fn get(path: web::Path<String>) -> Result<NamedFile, Error> {
         let id = parse_id(&path)?;
-        match web::block(move || queries::files::find(id, pool)).await {
+        match web::block(move || queries::files::find(id)).await {
             Ok(file) => {
-                let mut path = config.files_dir.clone();
+                let mut path = CONFIG.files_dir.clone();
                 path.push(file.filepath);
                 match NamedFile::open(&path) {
                     Ok(nf) => Ok(nf),
@@ -318,13 +292,8 @@ pub mod files {
     }
 
     /// Common code for PUT and POST routes
-    async fn put_post(
-        id: i32,
-        mut body: Multipart,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
-    ) -> Result<HttpResponse, Error> {
-        let mut path = config.files_dir.clone();
+    async fn put_post(id: i32, mut body: Multipart) -> Result<HttpResponse, Error> {
+        let mut path = CONFIG.files_dir.clone();
         let mut relative_path = PathBuf::new();
         let dir_path = path.clone();
         if web::block(move || fs::create_dir_all(dir_path))
@@ -356,7 +325,11 @@ pub mod files {
             Some(n) => n,
             None => return Err(HttpResponse::BadRequest().body("Missing filename").into()),
         };
-        let filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
+        let filename = format!(
+            "{}.{}",
+            radix_fmt::radix_36(Utc::now().timestamp()),
+            filename
+        );
         path.push(&filename);
         relative_path.push(&filename);
         let relative_path = match path.to_str() {
@@ -402,7 +375,7 @@ pub mod files {
         }
 
         match_replace_result(
-            web::block(move || queries::files::replace(id, &relative_path, pool)).await,
+            web::block(move || queries::files::replace(id, &relative_path)).await,
             id,
         )
     }
@@ -412,28 +385,22 @@ pub mod files {
         request: HttpRequest,
         path: web::Path<String>,
         body: Multipart,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
+        auth(identity, request).await?;
         let id = parse_id(&path)?;
-        put_post(id, body, pool, config).await
+        put_post(id, body).await
     }
 
     /// POST a new file entry using a multipart body
     pub async fn post(
         request: HttpRequest,
         body: Multipart,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
-        let id = random_id(&pool).await?;
-        put_post(id, body, pool, config).await
+        auth(identity, request).await?;
+        let id = random_id().await?;
+        put_post(id, body).await
     }
 }
 
@@ -443,7 +410,6 @@ pub mod links {
         routes::{
             auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
         },
-        Pool,
     };
     use actix_identity::Identity;
     use actix_web::{web, Error, HttpRequest, HttpResponse};
@@ -453,12 +419,9 @@ pub mod links {
     random_id!(links);
 
     /// GET a link entry and redirect to it
-    pub async fn get(
-        path: web::Path<String>,
-        pool: web::Data<Pool>,
-    ) -> Result<HttpResponse, Error> {
+    pub async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
         let id = parse_id(&path)?;
-        match web::block(move || queries::links::find(id, pool)).await {
+        match web::block(move || queries::links::find(id)).await {
             Ok(link) => Ok(HttpResponse::Found()
                 .header("Location", link.forward)
                 .header("Last-Modified", timestamp_to_last_modified(link.created))
@@ -478,14 +441,12 @@ pub mod links {
         request: HttpRequest,
         path: web::Path<String>,
         body: web::Json<PutPostLink>,
-        pool: web::Data<Pool>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
+        auth(identity, request).await?;
         let id = parse_id(&path)?;
         match_replace_result(
-            web::block(move || queries::links::replace(id, &body.forward, pool)).await,
+            web::block(move || queries::links::replace(id, &body.forward)).await,
             id,
         )
     }
@@ -494,14 +455,12 @@ pub mod links {
     pub async fn post(
         request: HttpRequest,
         body: web::Json<PutPostLink>,
-        pool: web::Data<Pool>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
-        let id = random_id(&pool).await?;
+        auth(identity, request).await?;
+        let id = random_id().await?;
         match_replace_result(
-            web::block(move || queries::links::replace(id, &body.forward, pool)).await,
+            web::block(move || queries::links::replace(id, &body.forward)).await,
             id,
         )
     }
@@ -510,15 +469,14 @@ pub mod links {
 pub mod texts {
     use crate::routes::escape_html;
     use crate::{
+        globals::CONFIG,
+        routes::{HIGHLIGHT_CONTENTS, HIGHLIGHT_LANGUAGE},
+    };
+    use crate::{
         queries::{self, SelectQuery},
         routes::{
             auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
         },
-        Pool,
-    };
-    use crate::{
-        routes::{HIGHLIGHT_CONTENTS, HIGHLIGHT_LANGUAGE},
-        setup::Config,
     };
     use actix_identity::Identity;
     use actix_web::{web, Error, HttpRequest, HttpResponse};
@@ -528,17 +486,13 @@ pub mod texts {
     random_id!(texts);
 
     /// GET a text entry and display it
-    pub async fn get(
-        config: web::Data<Config>,
-        path: web::Path<String>,
-        pool: web::Data<Pool>,
-    ) -> Result<HttpResponse, Error> {
+    pub async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
         let id = parse_id(&path)?;
-        match web::block(move || queries::texts::find(id, pool)).await {
+        match web::block(move || queries::texts::find(id)).await {
             Ok(text) => {
                 let last_modified = timestamp_to_last_modified(text.created);
                 if text.highlight {
-                    let languages: Vec<String> = config
+                    let languages: Vec<String> = CONFIG
                         .highlight
                         .languages
                         .iter()
@@ -547,7 +501,7 @@ pub mod texts {
                     let languages = languages.join("\n");
                     let contents = HIGHLIGHT_CONTENTS
                         .replace("{{ title }}", &path)
-                        .replace("{{ theme }}", &config.highlight.theme)
+                        .replace("{{ theme }}", &CONFIG.highlight.theme)
                         .replace("{{ contents }}", &escape_html(&text.contents))
                         .replace("{{ languages }}", &languages);
 
@@ -577,15 +531,12 @@ pub mod texts {
         request: HttpRequest,
         path: web::Path<String>,
         body: web::Json<PutPostText>,
-        pool: web::Data<Pool>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
+        auth(identity, request).await?;
         let id = parse_id(&path)?;
         match_replace_result(
-            web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
-                .await,
+            web::block(move || queries::texts::replace(id, &body.contents, body.highlight)).await,
             id,
         )
     }
@@ -594,15 +545,12 @@ pub mod texts {
     pub async fn post(
         request: HttpRequest,
         body: web::Json<PutPostText>,
-        pool: web::Data<Pool>,
         identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
-        let id = random_id(&pool).await?;
+        auth(identity, request).await?;
+        let id = random_id().await?;
         match_replace_result(
-            web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
-                .await,
+            web::block(move || queries::texts::replace(id, &body.contents, body.highlight)).await,
             id,
         )
     }

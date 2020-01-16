@@ -16,13 +16,7 @@ use diesel::{
 };
 use std::process;
 
-#[cfg(feature = "dev")]
-use crate::setup::Config;
-#[cfg(feature = "dev")]
-use dotenv;
-#[cfg(not(feature = "dev"))]
-use std::fs;
-
+pub mod globals;
 pub mod models;
 pub mod queries;
 pub mod routes;
@@ -35,58 +29,29 @@ pub type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 #[cfg(not(feature = "dev"))]
 embed_migrations!();
 
+use globals::{CONFIG, KEY};
+
 #[actix_rt::main]
 async fn main() {
-    let config = {
-        #[cfg(feature = "dev")]
-        {
-            Config::debug()
-        }
-        #[cfg(not(feature = "dev"))]
-        {
-            setup::init()
-        }
-    };
     setup::init_logger();
 
-    let pool = setup::create_pool(&config.database_url, config.pool_size);
     #[cfg(not(feature = "dev"))]
     {
-        embedded_migrations::run(&pool.get().unwrap()).unwrap_or_else(|e| {
+        embedded_migrations::run(&globals::POOL.get().unwrap()).unwrap_or_else(|e| {
             eprintln!("Can't prepare database: {}", e);
             process::exit(1);
         });
     }
 
-    let password_hash = {
-        #[cfg(feature = "dev")]
-        {
-            dotenv::dotenv().ok();
-            let password = get_env!("PASSWD");
-            setup::hash(&password)
-        }
-        #[cfg(not(feature = "dev"))]
-        {
-            let password_path = setup::get_password_path();
-            fs::read(&password_path).unwrap_or_else(|e| {
-                eprintln!("Can't read password hash from disk: {}.", e);
-                process::exit(1);
-            })
-        }
-    };
-
-    let port = config.port;
+    let port = CONFIG.port;
     println!("Listening on port {}", port);
 
     HttpServer::new(move || {
         App::new()
-            .data(pool.clone())
-            .data(config.clone())
-            .data(password_hash.clone())
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&[0; 32])
+                CookieIdentityPolicy::new(KEY)
                     .name("filite-auth-cookie")
-                    .secure(false),
+                    .secure(true),
             ))
             .wrap(setup::logger_middleware())
             .route("/", web::get().to(routes::index))

@@ -1,8 +1,7 @@
 //! Utilities used during the initial setup
 
-use crate::Pool;
+use crate::{globals::KEY, Pool};
 use actix_web::middleware::Logger;
-use blake2::{Blake2b, Digest};
 use diesel::{
     r2d2::{self, ConnectionManager},
     sqlite::SqliteConnection,
@@ -51,10 +50,8 @@ pub fn get_password_path() -> PathBuf {
 }
 
 /// Returns the BLAKE2b digest of the input string
-pub fn hash<T: AsRef<[u8]>>(input: T) -> Vec<u8> {
-    let mut hasher = Blake2b::new();
-    hasher.input(input);
-    hasher.result().to_vec()
+pub fn hash(input: &[u8]) -> Vec<u8> {
+    blake3::keyed_hash(KEY, input).as_bytes().to_vec()
 }
 
 /// Returns an environment variable and panic if it isn't found
@@ -294,7 +291,7 @@ pub fn init() -> Config {
             }
         }
 
-        let password_hash = hash(&password);
+        let password_hash = hash(password.as_bytes());
         fs::write(&password_path, password_hash.as_slice()).unwrap_or_else(|e| {
             eprintln!("Can't write password: {}", e);
             process::exit(1);
