@@ -9,17 +9,15 @@ use diesel::{
 use std::{env, path::PathBuf};
 
 #[cfg(not(feature = "dev"))]
+use dialoguer::{Confirmation, PasswordInput};
+#[cfg(not(feature = "dev"))]
 use dirs;
 #[cfg(feature = "dev")]
 use dotenv;
 #[cfg(feature = "dev")]
 use std::str::FromStr;
 #[cfg(not(feature = "dev"))]
-use std::{
-    fs,
-    io::{self, BufRead},
-    process,
-};
+use std::{fs, process};
 #[cfg(not(feature = "dev"))]
 use toml;
 
@@ -262,31 +260,31 @@ pub fn init() -> Config {
 
     let password_path = get_password_path();
     if !password_path.exists() {
-        let stdin = io::stdin();
-        let mut stdin = stdin.lock();
-        let mut password = String::new();
-
+        let mut password;
         loop {
-            println!("Enter the password to use: ");
-            stdin.read_line(&mut password).unwrap_or_else(|e| {
-                eprintln!("Can't read password: {}", e);
-                process::exit(1);
-            });
+            password = PasswordInput::new()
+                .with_prompt("Enter password")
+                .with_confirmation("Confirm password", "Mismatched passwords")
+                .allow_empty_password(true)
+                .interact()
+                .unwrap_or_else(|e| {
+                    eprintln!("Can't read password: {}", e);
+                    process::exit(1);
+                });
 
-            password = password.replace("\r", "");
-            password = password.replace("\n", "");
             if !password.is_empty() {
                 break;
             }
 
-            println!("Are you sure you want to leave an empty password? This will disable authentication: [y/N]: ");
-            let mut answer = String::new();
-            stdin.read_line(&mut answer).unwrap_or_else(|e| {
-                eprintln!("Can't read answer: {}", e);
-                process::exit(1);
-            });
-
-            if answer.trim() == "y" {
+            let keep_empty = Confirmation::new()
+                .with_text("Are you sure you want to leave an empty password? This will disable authentication")
+                .default(false)
+                .interact()
+                .unwrap_or_else(|e| {
+                    eprintln!("Can't read password: {}", e);
+                    process::exit(1);
+                });
+            if keep_empty {
                 break;
             }
         }
