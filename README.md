@@ -5,7 +5,7 @@ A simple, light and standalone pastebin, URL shortener and file-sharing service 
 [![GitHub Actions](https://github.com/raftario/filite/workflows/Build/badge.svg)](https://github.com/raftario/filite/actions?workflowID=Build)
 [![Crates.io](https://img.shields.io/crates/v/filite.svg)](https://crates.io/crates/filite)
 
-[Live Example](https://filite.raphaeltheriault.com)
+[Live Example](https://filite.raphaeltheriault.com) (file upload disabled and rate limited)
 
 ## Table of Contents
 
