@@ -18,7 +18,8 @@ lazy_static! {
 
 #[cfg(not(feature = "dev"))]
 lazy_static! {
-    pub static ref CONFIG: crate::setup::Config = crate::setup::init();
+    pub static ref CONFIG: crate::setup::Config =
+        crate::setup::init(std::env::args().any(|a| &a == "init"));
     pub static ref PASSWORD_HASH: Vec<u8> = {
         let password_path = crate::setup::get_password_path();
         std::fs::read(&password_path).unwrap_or_else(|e| {
