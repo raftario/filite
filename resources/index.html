@@ -359,35 +359,30 @@
                             return;
                         }
 
-                        let fileReader = new FileReader();
-                        fileReader.onload = () => {
-                            const id = urlInput.value;
-                            const url = `${baseUrl}f/${id}`;
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        const id = urlInput.value;
+                        const url = `${baseUrl}f/${id}`;
 
-                            const base64 = btoa(fileReader.result);
-                            const filename = file.name;
-                            let status;
-                            fetch(url, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ base64, filename }),
+                        let status;
+                        fetch(url, {
+                            method: "PUT",
+                            body: fd,
+                        })
+                            .then((response) => {
+                                status = response.status;
+                                return response.text();
                             })
-                                .then((response) => {
-                                    status = response.status;
-                                    return response.text();
-                                })
-                                .then((text) => {
-                                    if (status !== 201) {
-                                        throw new Error(text);
-                                    } else {
-                                        openModal(url);
-                                        clearInputs();
-                                        fetchUsed();
-                                    }
-                                })
-                                .catch((error) => alert(error));
-                        };
-                        fileReader.readAsBinaryString(file);
+                            .then((text) => {
+                                if (status !== 201) {
+                                    throw new Error(text);
+                                } else {
+                                    openModal(url);
+                                    clearInputs();
+                                    fetchUsed();
+                                }
+                            })
+                            .catch((error) => alert(error));
                     });
                 } else if (group === "links") {
                     submitButton.addEventListener("click", () => {
@@ -398,7 +393,6 @@
                         let status;
                         fetch(url, {
                             method: "PUT",
-                            headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ forward }),
                         })
                             .then((response) => {
@@ -426,7 +420,6 @@
                         let status;
                         fetch(url, {
                             method: "PUT",
-                            headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ contents, highlight }),
                         })
                             .then((response) => {

@@ -9,7 +9,7 @@ extern crate serde;
 extern crate diesel_migrations;
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{web, App, FromRequest, HttpServer};
+use actix_web::{web, App, HttpServer};
 use diesel::{
     r2d2::{self, ConnectionManager},
     sqlite::SqliteConnection,
@@ -53,7 +53,7 @@ async fn main() {
     #[cfg(not(feature = "dev"))]
     {
         embedded_migrations::run(&pool.get().unwrap()).unwrap_or_else(|e| {
-            eprintln!("Can't prepare database: {}.", e);
+            eprintln!("Can't prepare database: {}", e);
             process::exit(1);
         });
     }
@@ -76,8 +76,6 @@ async fn main() {
     };
 
     let port = config.port;
-    let max_filesize_json = (config.max_filesize as f64 * 1.37) as usize;
-
     println!("Listening on port {}", port);
 
     HttpServer::new(move || {
@@ -111,9 +109,6 @@ async fn main() {
             )
             .service(
                 web::resource("/f/{id}")
-                    .data(web::Json::<routes::files::PutFile>::configure(|cfg| {
-                        cfg.limit(max_filesize_json)
-                    }))
                     .route(web::get().to(routes::files::get))
                     .route(web::put().to(routes::files::put))
                     .route(web::delete().to(routes::files::delete)),
@@ -133,13 +128,13 @@ async fn main() {
     })
     .bind(&format!("localhost:{}", port))
     .unwrap_or_else(|e| {
-        eprintln!("Can't bind webserver to specified port: {}.", e);
+        eprintln!("Can't bind webserver to specified port: {}", e);
         process::exit(1);
     })
     .run()
     .await
     .unwrap_or_else(|e| {
-        eprintln!("Can't start webserver: {}.", e);
+        eprintln!("Can't start webserver: {}", e);
         process::exit(1);
     });
 }

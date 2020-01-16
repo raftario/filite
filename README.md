@@ -55,8 +55,6 @@ database_url = "database.db"
 pool_size = 4
 # Path to the directory where files will be stored, relative or absolute
 files_dir = "files"
-# Max allowed size for file uploads, in bytes
-max_filesize = 10000000
 
 # Highlight.js configuration
 [highlight]

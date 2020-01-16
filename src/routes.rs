@@ -83,20 +83,8 @@ async fn auth(
     }
 }
 
-/// Match result from REPLACE queries for PUT routes
-fn match_replace_result_put<T: Serialize>(
-    result: Result<T, BlockingError<diesel::result::Error>>,
-) -> Result<HttpResponse, Error> {
-    match result {
-        Ok(x) => Ok(HttpResponse::Created().json(x)),
-        Err(_) => Err(HttpResponse::InternalServerError()
-            .body("Internal server error")
-            .into()),
-    }
-}
-
-/// Match result from REPLACE queries for POST routes
-fn match_replace_result_post<T: Serialize>(
+/// Match result from REPLACE queries
+fn match_replace_result<T: Serialize>(
     result: Result<T, BlockingError<diesel::result::Error>>,
     id: i32,
 ) -> Result<HttpResponse, Error> {
@@ -286,6 +274,7 @@ pub async fn logout(identity: Identity) -> impl Responder {
 }
 
 pub mod files {
+    use crate::routes::match_replace_result;
     use crate::{
         queries::{self, SelectQuery},
         routes::{auth, match_find_error, parse_id},
@@ -328,17 +317,15 @@ pub mod files {
         }
     }
 
-    /// Request body when PUTting files
-    #[derive(Deserialize)]
-    pub struct PutFile {
-        pub base64: String,
-        pub filename: String,
-    }
-
-    /// Common setup for both PUT and POST
-    async fn setup(config: &Config) -> Result<(PathBuf, PathBuf), Error> {
-        let path = config.files_dir.clone();
-        let relative_path = PathBuf::new();
+    /// Common code for PUT and POST routes
+    async fn put_post(
+        id: i32,
+        mut body: Multipart,
+        pool: web::Data<Pool>,
+        config: web::Data<Config>,
+    ) -> Result<HttpResponse, Error> {
+        let mut path = config.files_dir.clone();
+        let mut relative_path = PathBuf::new();
         let dir_path = path.clone();
         if web::block(move || fs::create_dir_all(dir_path))
             .await
@@ -348,78 +335,6 @@ pub mod files {
                 .body("Internal server error")
                 .into());
         }
-
-        Ok((path, relative_path))
-    }
-    /// Common conversion for both PUT and POST
-    fn pts(path: &PathBuf) -> Result<String, Error> {
-        match path.to_str() {
-            Some(rp) => Ok(rp.to_owned()),
-            None => Err(HttpResponse::InternalServerError()
-                .body("Internal server error")
-                .into()),
-        }
-    }
-
-    /// PUT a new file entry
-    pub async fn put(
-        request: HttpRequest,
-        path: web::Path<String>,
-        body: web::Json<PutFile>,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
-        identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
-    ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
-
-        let id = parse_id(&path)?;
-        let (mut path, mut relative_path) = setup(&config).await?;
-
-        let mut filename = body.filename.clone();
-        filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
-        path.push(&filename);
-        relative_path.push(&filename);
-        let relative_path = pts(&relative_path)?;
-
-        let contents = match web::block(move || base64::decode(&body.base64)).await {
-            Ok(contents) => contents,
-            Err(_) => {
-                return Err(HttpResponse::BadRequest()
-                    .body("Invalid base64 encoded file")
-                    .into())
-            }
-        };
-        if web::block(move || fs::write(&path, contents))
-            .await
-            .is_err()
-        {
-            return Err(HttpResponse::InternalServerError()
-                .body("Internal server error")
-                .into());
-        }
-
-        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
-            Ok(file) => Ok(HttpResponse::Created().json(file)),
-            Err(_) => Err(HttpResponse::InternalServerError()
-                .body("Internal server error")
-                .into()),
-        }
-    }
-
-    /// POST a new file entry using a multipart body
-    pub async fn post(
-        request: HttpRequest,
-        mut body: Multipart,
-        pool: web::Data<Pool>,
-        config: web::Data<Config>,
-        identity: Identity,
-        password_hash: web::Data<Vec<u8>>,
-    ) -> Result<HttpResponse, Error> {
-        auth(identity, request, &password_hash).await?;
-
-        let id = random_id(&pool).await?;
-        let (mut path, mut relative_path) = setup(&config).await?;
 
         let mut field = match body.next().await {
             Some(f) => f?,
@@ -444,7 +359,14 @@ pub mod files {
         let filename = format!("{:x}.{}", Utc::now().timestamp(), filename);
         path.push(&filename);
         relative_path.push(&filename);
-        let relative_path = pts(&relative_path)?;
+        let relative_path = match path.to_str() {
+            Some(rp) => rp.to_owned(),
+            None => {
+                return Err(HttpResponse::InternalServerError()
+                    .body("Internal server error")
+                    .into())
+            }
+        };
 
         let mut f = match web::block(move || File::create(&path)).await {
             Ok(f) => f,
@@ -479,12 +401,39 @@ pub mod files {
             };
         }
 
-        match web::block(move || queries::files::replace(id, &relative_path, pool)).await {
-            Ok(_) => Ok(HttpResponse::Created().body(format!("{}", radix_fmt::radix_36(id)))),
-            Err(_) => Err(HttpResponse::InternalServerError()
-                .body("Internal server error")
-                .into()),
-        }
+        match_replace_result(
+            web::block(move || queries::files::replace(id, &relative_path, pool)).await,
+            id,
+        )
+    }
+
+    /// PUT a new file entry
+    pub async fn put(
+        request: HttpRequest,
+        path: web::Path<String>,
+        body: Multipart,
+        pool: web::Data<Pool>,
+        config: web::Data<Config>,
+        identity: Identity,
+        password_hash: web::Data<Vec<u8>>,
+    ) -> Result<HttpResponse, Error> {
+        auth(identity, request, &password_hash).await?;
+        let id = parse_id(&path)?;
+        put_post(id, body, pool, config).await
+    }
+
+    /// POST a new file entry using a multipart body
+    pub async fn post(
+        request: HttpRequest,
+        body: Multipart,
+        pool: web::Data<Pool>,
+        config: web::Data<Config>,
+        identity: Identity,
+        password_hash: web::Data<Vec<u8>>,
+    ) -> Result<HttpResponse, Error> {
+        auth(identity, request, &password_hash).await?;
+        let id = random_id(&pool).await?;
+        put_post(id, body, pool, config).await
     }
 }
 
@@ -492,8 +441,7 @@ pub mod links {
     use crate::{
         queries::{self, SelectQuery},
         routes::{
-            auth, match_find_error, match_replace_result_post, match_replace_result_put, parse_id,
-            timestamp_to_last_modified,
+            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
         },
         Pool,
     };
@@ -535,10 +483,10 @@ pub mod links {
         password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
         auth(identity, request, &password_hash).await?;
-
         let id = parse_id(&path)?;
-        match_replace_result_put(
+        match_replace_result(
             web::block(move || queries::links::replace(id, &body.forward, pool)).await,
+            id,
         )
     }
 
@@ -551,9 +499,8 @@ pub mod links {
         password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
         auth(identity, request, &password_hash).await?;
-
         let id = random_id(&pool).await?;
-        match_replace_result_post(
+        match_replace_result(
             web::block(move || queries::links::replace(id, &body.forward, pool)).await,
             id,
         )
@@ -565,8 +512,7 @@ pub mod texts {
     use crate::{
         queries::{self, SelectQuery},
         routes::{
-            auth, match_find_error, match_replace_result_post, match_replace_result_put, parse_id,
-            timestamp_to_last_modified,
+            auth, match_find_error, match_replace_result, parse_id, timestamp_to_last_modified,
         },
         Pool,
     };
@@ -636,11 +582,11 @@ pub mod texts {
         password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
         auth(identity, request, &password_hash).await?;
-
         let id = parse_id(&path)?;
-        match_replace_result_put(
+        match_replace_result(
             web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
                 .await,
+            id,
         )
     }
 
@@ -653,9 +599,8 @@ pub mod texts {
         password_hash: web::Data<Vec<u8>>,
     ) -> Result<HttpResponse, Error> {
         auth(identity, request, &password_hash).await?;
-
         let id = random_id(&pool).await?;
-        match_replace_result_post(
+        match_replace_result(
             web::block(move || queries::texts::replace(id, &body.contents, body.highlight, pool))
                 .await,
             id,

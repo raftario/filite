@@ -86,8 +86,6 @@ pub struct Config {
     pub pool_size: u32,
     /// Directory where to store static files
     pub files_dir: PathBuf,
-    /// Maximum allowed file size
-    pub max_filesize: usize,
     /// Highlight.js configuration
     pub highlight: HighlightConfig,
 }
@@ -113,14 +111,12 @@ impl Default for Config {
         };
         let pool_size = std::cmp::max(1, num_cpus::get() as u32 / 2);
         let files_dir = get_data_dir().join("files");
-        let max_filesize = 10_000_000;
 
         Self {
             port,
             database_url,
             pool_size,
             files_dir,
-            max_filesize,
             highlight: HighlightConfig::default(),
         }
     }
@@ -211,14 +207,12 @@ impl Config {
                     .expect("Invalid FILES_DIR")
             }
         };
-        let max_filesize = parse_env!("MAX_FILESIZE");
 
         Self {
             port,
             database_url,
             pool_size,
             files_dir,
-            max_filesize,
             highlight: HighlightConfig::default(),
         }
     }
