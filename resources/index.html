@@ -318,13 +318,14 @@
                             (x) => x.id === parseInt(urlInput.value, 36)
                         )
                     ) {
-                        urlInput.classList.add("conflict");
+                        urlInput.setCustomValidity("ID already in use");
                     } else {
-                        urlInput.classList.remove("conflict");
+                        urlInput.setCustomValidity("");
                     }
                     submitButton.disabled = inputs[group].some(
                         (input) =>
-                            input.validity != undefined && !input.validity.valid
+                            input.validity !== undefined &&
+                            !input.validity.valid
                     );
                 };
                 checkValidity();
@@ -394,6 +395,7 @@
                         fetch(url, {
                             method: "PUT",
                             body: JSON.stringify({ forward }),
+                            headers: { "Content-Type": "application/json" },
                         })
                             .then((response) => {
                                 status = response.status;
@@ -421,6 +423,7 @@
                         fetch(url, {
                             method: "PUT",
                             body: JSON.stringify({ contents, highlight }),
+                            headers: { "Content-Type": "application/json" },
                         })
                             .then((response) => {
                                 status = response.status;

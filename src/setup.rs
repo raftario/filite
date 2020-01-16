@@ -277,7 +277,7 @@ pub fn init(init: bool) -> Config {
             }
 
             let keep_empty = Confirmation::new()
-                .with_text("Are you sure you want to leave an empty password? This will disable authentication")
+                .with_text("Are you sure you want to leave an empty password? This will disable authentication.")
                 .default(false)
                 .interact()
                 .unwrap_or_else(|e| {
