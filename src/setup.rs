@@ -88,6 +88,8 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(not(feature = "dev"), serde(default))]
 pub struct HighlightConfig {
+    /// Path to the theme to use
+    pub themepath: String,
     /// Theme to use
     pub theme: String,
     /// Additional languages to include
@@ -120,6 +122,7 @@ impl Default for Config {
 impl Default for HighlightConfig {
     fn default() -> Self {
         Self {
+            themepath: "https://cdnjs.cloudflare.com/ajax/libs/spectre.css/0.5.8/".to_owned(),
             theme: "github".to_owned(),
             languages: vec!["rust".to_owned()],
         }
