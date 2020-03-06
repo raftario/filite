@@ -55,6 +55,9 @@ async fn main() {
             ))
             .wrap(setup::logger_middleware())
             .route("/", web::get().to(routes::index))
+            .route("/highlight.min.js", web::get().to(routes::js))
+            .route("/spectre-icons.min.css", web::get().to(routes::icon))
+            .route("/spectre.min.css", web::get().to(routes::css))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))
             .service(

@@ -203,10 +203,34 @@ lazy_static! {
         index_path.push("index.html");
         index_path
     };
+    static ref JS_PATH: PathBuf = {
+        let mut js_path = PathBuf::new();
+        js_path.push(get_env!("CARGO_MANIFEST_DIR"));
+        js_path.push("resources");
+        js_path.push("highlight.min.js");
+        js_path
+    };
+    static ref ICON_PATH: PathBuf = {
+        let mut icon_path = PathBuf::new();
+        icon_path.push(get_env!("CARGO_MANIFEST_DIR"));
+        icon_path.push("resources");
+        icon_path.push("spectre-icons.min.css");
+        icon_path
+    };
+    static ref CSS_PATH: PathBuf = {
+        let mut css_path = PathBuf::new();
+        css_path.push(get_env!("CARGO_MANIFEST_DIR"));
+        css_path.push("resources");
+        css_path.push("spectre.min.css");
+        css_path
+    };
 }
 
 #[cfg(not(feature = "dev"))]
 static INDEX_CONTENTS: &str = include_str!("../resources/index.html");
+static JS_CONTENTS: &str = include_str!("../resources/highlight.min.js");
+static ICON_CONTENTS: &str = include_str!("../resources/spectre-icons.min.css");
+static CSS_CONTENTS: &str = include_str!("../resources/spectre.min.css");
 
 static HIGHLIGHT_CONTENTS: &str = include_str!("../resources/highlight.html");
 const HIGHLIGHT_LANGUAGE: &str = r#"<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/languages/{{ language }}.min.js"></script>"#;
@@ -229,6 +253,69 @@ pub async fn index(request: HttpRequest, identity: Identity) -> impl Responder {
     };
     HttpResponse::Ok()
         .header("Content-Type", "text/html")
+        .body(contents.replace("{{ themepath }}", &CONFIG.highlight.themepath))
+}
+
+/// CSS file to style the page from a local source
+pub async fn css(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*CSS_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            CSS_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/css")
+        .body(contents)
+}
+
+/// Icon-specific CSS file to style the page from a local source
+pub async fn icon(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*ICON_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            ICON_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/css")
+        .body(contents)
+}
+
+/// JS file to highlight code from a local source
+pub async fn js(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*JS_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            JS_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/javascript")
         .body(contents)
 }
 
@@ -502,6 +589,7 @@ pub mod texts {
                     let contents = HIGHLIGHT_CONTENTS
                         .replace("{{ title }}", &path)
                         .replace("{{ theme }}", &CONFIG.highlight.theme)
+                        .replace("{{ themepath }}", &CONFIG.highlight.themepath)
                         .replace("{{ contents }}", &escape_html(&text.contents))
                         .replace("{{ languages }}", &languages);
 
@@ -512,7 +600,7 @@ pub mod texts {
                 } else {
                     Ok(HttpResponse::Ok()
                         .header("Last-Modified", last_modified)
-                        .body(text.contents))
+                        .body(text.contents.replace("{{ themepath }}", &CONFIG.highlight.themepath)))
                 }
             }
             Err(e) => match_find_error(e),
