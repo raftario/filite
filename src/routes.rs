@@ -251,9 +251,10 @@ pub async fn index(request: HttpRequest, identity: Identity) -> impl Responder {
             INDEX_CONTENTS.to_owned()
         }
     };
+    let final_contents = contents.replace("{{ themepath }}", &CONFIG.highlight.themepath);
     HttpResponse::Ok()
         .header("Content-Type", "text/html")
-        .body(contents.replace("{{ themepath }}", &CONFIG.highlight.themepath))
+        .body(final_contents)
 }
 
 /// CSS file to style the page from a local source
