@@ -43,7 +43,7 @@ async fn auth(identity: Identity, request: HttpRequest) -> Result<(), HttpRespon
         None => {
             return Err(HttpResponse::Unauthorized()
                 .header("WWW-Authenticate", "Basic realm=\"filite\"")
-                .body("Unauthorized"))
+                .body("Unauthorized"));
         }
     };
     let connection_string = header.replace("Basic ", "");
@@ -179,13 +179,13 @@ macro_rules! random_id {
                             _ => {
                                 return Err(actix_web::HttpResponse::InternalServerError()
                                     .body("Internal server error")
-                                    .into())
+                                    .into());
                             }
                         },
                         actix_web::error::BlockingError::Canceled => {
                             return Err(actix_web::HttpResponse::InternalServerError()
                                 .body("Internal server error")
-                                .into())
+                                .into());
                         }
                     },
                 }
@@ -398,7 +398,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::BadRequest()
                     .body("Empty multipart body")
-                    .into())
+                    .into());
             }
         };
         let content_disposition = match field.content_disposition() {
@@ -406,7 +406,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::BadRequest()
                     .body("Missing content disposition")
-                    .into())
+                    .into());
             }
         };
         let filename = match content_disposition.get_filename() {
@@ -425,7 +425,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::InternalServerError()
                     .body("Internal server error")
-                    .into())
+                    .into());
             }
         };
 
@@ -434,7 +434,7 @@ pub mod files {
             Err(_) => {
                 return Err(HttpResponse::InternalServerError()
                     .body("Internal server error")
-                    .into())
+                    .into());
             }
         };
         while let Some(chunk) = field.next().await {
@@ -443,13 +443,15 @@ pub mod files {
                 Err(_) => {
                     return Err(HttpResponse::BadRequest()
                         .body("Invalid multipart data")
-                        .into())
+                        .into());
                 }
             };
 
-            f = match web::block(move || match f.write_all(&data) {
-                Ok(_) => Ok(f),
-                Err(_) => Err(()),
+            f = match web::block(move || {
+                match f.write_all(&data) {
+                    Ok(_) => Ok(f),
+                    Err(_) => Err(()),
+                }
             })
             .await
             {
@@ -457,7 +459,7 @@ pub mod files {
                 Err(_) => {
                     return Err(HttpResponse::InternalServerError()
                         .body("Internal server error")
-                        .into())
+                        .into());
                 }
             };
         }
@@ -601,7 +603,10 @@ pub mod texts {
                 } else {
                     Ok(HttpResponse::Ok()
                         .header("Last-Modified", last_modified)
-                        .body(text.contents.replace("{{ themepath }}", &CONFIG.highlight.themepath)))
+                        .body(
+                            text.contents
+                                .replace("{{ themepath }}", &CONFIG.highlight.themepath),
+                        ))
                 }
             }
             Err(e) => match_find_error(e),
