@@ -252,6 +252,14 @@ pub async fn logout(identity: Identity) -> impl Responder {
     }
 }
 
+pub async fn id_to_str(path: web::Path<String>) -> impl Responder {
+    let id: i32 = match path.parse() {
+        Ok(id) => id,
+        Err(_) => return Err(HttpResponse::BadRequest().body("Invalid ID")),
+    };
+    Ok(HttpResponse::Ok().body(radix_fmt::radix_36(id).to_string()))
+}
+
 pub mod files {
     use crate::routes::match_replace_result;
     use crate::{

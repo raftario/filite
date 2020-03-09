@@ -57,6 +57,7 @@ async fn main() {
             .route("/", web::get().to(routes::index))
             .route("/logout", web::get().to(routes::logout))
             .route("/config", web::get().to(routes::get_config))
+            .route("/id/{id}", web::get().to(routes::id_to_str))
             .service(
                 web::resource("/f")
                     .route(web::get().to(routes::files::select))
