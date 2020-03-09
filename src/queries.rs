@@ -65,10 +65,10 @@ macro_rules! find {
 
 /// DELETE an entry
 macro_rules! delete {
-    ($n:ident) => {
+    ($n:ident, $t:ty) => {
         pub fn delete(d_id: i32) -> diesel::result::QueryResult<()> {
             let conn: &SqliteConnection = &crate::globals::POOL.get().unwrap();
-            diesel::delete($n.find(d_id)).execute(conn)?;
+            diesel::delete(&$n.find(d_id).first::<$t>(conn)?).execute(conn)?;
             Ok(())
         }
     };
@@ -142,7 +142,7 @@ pub mod files {
         fs_del(d_id)?;
 
         let conn: &SqliteConnection = &POOL.get().unwrap();
-        diesel::delete(files.find(d_id)).execute(conn)?;
+        diesel::delete(&files.find(d_id).first::<File>(conn)?).execute(conn)?;
         Ok(())
     }
 }
@@ -158,7 +158,7 @@ pub mod links {
     use diesel::{prelude::*, result::QueryResult};
 
     find!(links, Link);
-    delete!(links);
+    delete!(links, Link);
 
     /// SELECT multiple link entries
     pub fn select(filters: SelectFilters) -> QueryResult<Vec<Link>> {
@@ -193,7 +193,7 @@ pub mod texts {
     use diesel::{prelude::*, result::QueryResult};
 
     find!(texts, Text);
-    delete!(texts);
+    delete!(texts, Text);
 
     /// SELECT multiple text entries
     pub fn select(filters: SelectFilters) -> QueryResult<Vec<Text>> {
