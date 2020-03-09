@@ -8,7 +8,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         include:
           - os: windows-latest
-            path: target/release/bm2.exe
+            path: target/release/filite.exe
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -34,12 +34,12 @@ jobs:
           args: --release
       - name: Strip binary
         if: runner.os != 'Windows'
-        run: strip target/release/bm2
+        run: strip target/release/filite
       - name: Upload binary
         uses: actions/upload-artifact@v1
         with:
           name: ${{ runner.os }}
-          path: ${{ matrix.path || 'target/release/bm2' }}
+          path: ${{ matrix.path || 'target/release/filite' }}
   checks:
     runs-on: ubuntu-latest
     steps:
