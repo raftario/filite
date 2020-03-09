@@ -251,15 +251,16 @@ pub fn logger_middleware() -> Logger {
 }
 
 /// Performs the initial setup
+// mode: 0 = normal, 1 = reset password, 2 = reset everything
 #[cfg(not(feature = "dev"))]
-pub fn init(init: bool) -> Config {
+pub fn init(mode: u8) -> Config {
     fs::create_dir_all(get_config_dir()).unwrap_or_else(|e| {
         eprintln!("Can't create config directory: {}.", e);
         process::exit(1);
     });
 
     let password_path = get_password_path();
-    if init {
+    if mode > 0 {
         let mut password;
         loop {
             password = PasswordInput::new()
@@ -295,12 +296,12 @@ pub fn init(init: bool) -> Config {
             process::exit(1);
         });
     } else if !get_password_path().exists() {
-        eprintln!("No password file found. Try running `filite init`.");
+        eprintln!("No password file found. Try running `filite init` or `filite passwd`.");
         process::exit(1);
     }
 
     let config_path = get_config_path();
-    if init {
+    if mode > 1 {
         println!("Generating config file at {}", config_path.display());
         let config = Config::default();
         config.write_file().unwrap_or_else(|e| {
@@ -312,7 +313,7 @@ pub fn init(init: bool) -> Config {
         process::exit(1);
     }
 
-    if init {
+    if mode > 0 {
         process::exit(0);
     }
     Config::read_file().unwrap_or_else(|e| {
