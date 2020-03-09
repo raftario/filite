@@ -1,0 +1,79 @@
+name: Build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        include:
+          - os: windows-latest
+            path: target/release/bm2.exe
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build project
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Strip binary
+        if: runner.os != 'Windows'
+        run: strip target/release/bm2
+      - name: Upload binary
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ runner.os }}
+          path: ${{ matrix.path || 'target/release/bm2' }}
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: checks-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: checks-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: target
+          key: checks-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup component add rustfmt
+      - run: rustup component add clippy
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
+      - name: Check for clippy warnings
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all -- -D warnings
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
