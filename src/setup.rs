@@ -122,7 +122,7 @@ impl Default for Config {
 impl Default for HighlightConfig {
     fn default() -> Self {
         Self {
-            themepath: "https://cdnjs.cloudflare.com/ajax/libs/spectre.css/0.5.8/".to_owned(),
+            themepath: "".to_owned(),
             theme: "github".to_owned(),
             languages: vec!["rust".to_owned()],
         }

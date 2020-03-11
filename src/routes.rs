@@ -196,34 +196,17 @@ macro_rules! random_id {
 
 #[cfg(feature = "dev")]
 lazy_static! {
-    static ref INDEX_PATH: PathBuf = {
-        let mut index_path = PathBuf::new();
-        index_path.push(get_env!("CARGO_MANIFEST_DIR"));
-        index_path.push("resources");
-        index_path.push("index.html");
-        index_path
-    };
-    static ref JS_PATH: PathBuf = {
-        let mut js_path = PathBuf::new();
-        js_path.push(get_env!("CARGO_MANIFEST_DIR"));
-        js_path.push("resources");
-        js_path.push("highlight.min.js");
-        js_path
-    };
-    static ref ICON_PATH: PathBuf = {
-        let mut icon_path = PathBuf::new();
-        icon_path.push(get_env!("CARGO_MANIFEST_DIR"));
-        icon_path.push("resources");
-        icon_path.push("spectre-icons.min.css");
-        icon_path
-    };
-    static ref CSS_PATH: PathBuf = {
-        let mut css_path = PathBuf::new();
-        css_path.push(get_env!("CARGO_MANIFEST_DIR"));
-        css_path.push("resources");
-        css_path.push("spectre.min.css");
-        css_path
-    };
+    fn static_resource_path(filename: &str) -> PathBuf {
+        let mut path = PathBuf::new();
+        path.push(get_env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        path.push(filename);
+        path
+    }
+    static ref INDEX_PATH: PathBuf = static_resource_path("index.html");
+    static ref JS_PATH: PathBuf = static_resource_path("index.html");
+    static ref ICON_PATH: PathBuf = static_resource_path("index.html");
+    static ref CSS_PATH: PathBuf = static_resource_path("index.html");
 }
 
 #[cfg(not(feature = "dev"))]
@@ -251,10 +234,9 @@ pub async fn index(request: HttpRequest, identity: Identity) -> impl Responder {
             INDEX_CONTENTS.to_owned()
         }
     };
-    let final_contents = contents.replace("{{ themepath }}", &CONFIG.highlight.themepath);
     HttpResponse::Ok()
         .header("Content-Type", "text/html")
-        .body(final_contents)
+        .body(contents.replace("{{ themepath }}", &CONFIG.highlight.themepath))
 }
 
 /// CSS file to style the page from a local source
@@ -447,11 +429,9 @@ pub mod files {
                 }
             };
 
-            f = match web::block(move || {
-                match f.write_all(&data) {
-                    Ok(_) => Ok(f),
-                    Err(_) => Err(()),
-                }
+            f = match web::block(move || match f.write_all(&data) {
+                Ok(_) => Ok(f),
+                Err(_) => Err(()),
             })
             .await
             {
