@@ -72,12 +72,12 @@ jobs:
           command: build
           args: --release --target armv7-unknown-linux-musleabihf
       - name: Strip binary
-        run: strip target/armv7-unknown-linux-musleabihf/filite
+        run: strip target/armv7-unknown-linux-musleabihf/release/filite
       - name: Upload binary
         uses: actions/upload-artifact@v1
         with:
           name: Pi
-          path: target/armv7-unknown-linux-musleabihf/filite
+          path: target/armv7-unknown-linux-musleabihf/release/filite
   checks:
     runs-on: ubuntu-latest
     steps:
