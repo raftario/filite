@@ -13,40 +13,19 @@ keywords = [
     "pastebin"
 ]
 license = "MIT"
-build = "build.rs"
 
 [dependencies]
-actix-files = "0.2.1"
-actix-identity = "0.2.1"
-actix-rt = "1.0.0"
-actix-multipart = "0.2.0"
-actix-web = "2.0.0"
-base64 = "0.11.0"
-blake3 = "0.1.1"
-chrono = "0.4.10"
-dialoguer = "0.5.0"
-diesel_migrations = "1.4.0"
-dirs = "2.0.2"
 dotenv = { version = "0.15.0", optional = true }
+chrono = "0.4.11"
 env_logger = "0.7.1"
-futures = "0.3.1"
-lazy_static = "1.4.0"
-num_cpus = "1.11.1"
-radix_fmt = "1.0.0"
-rand = "0.7.3"
-toml = "0.5.5"
-[dependencies.diesel]
-version = "1.4.3"
-features = ["r2d2", "sqlite"]
-[dependencies.libsqlite3-sys]
-version = "0.16.0"
-features = ["bundled"]
-[dependencies.serde]
-version = "1.0.104"
-features = ["derive"]
-
-[build-dependencies]
-rand = "0.7.3"
+envy = "0.4.1"
+log = "0.4.8"
+rusqlite = { version = "0.23.1", features = ["bundled", "chrono"] }
+rust-argon2 = "0.8.2"
+serde = { version = "1.0.112", features = ["derive"] }
+tokio = { version = "0.2.21", features = ["blocking", "fs", "macros"] }
+toml = "0.5.6"
+warp = { version = "0.2.3", features = ["multipart", "tls"], default-features = false }
 
 [features]
 default = []

@@ -1,10 +1,6 @@
-# Rust build artifacts
 target/
-**/*.rs.bk
 
-# User specific files
 .env
-**/*.log
 
-# JetBrains settings
+.vscode/
 .idea/

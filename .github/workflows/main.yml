@@ -1,4 +1,4 @@
-name: Build
+name: CI
 on: [push, pull_request]
 jobs:
   build:
@@ -7,8 +7,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         include:
+          - os: ubuntu-latest
+            bin-path: target/release/filite
           - os: windows-latest
-            path: target/release/filite.exe
+            bin-path: target/release/filite.exe
+          - os: macOS-latest
+            bin-path: target/release/filite
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -31,15 +35,49 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          args: --release -p lilac-cli
       - name: Strip binary
         if: runner.os != 'Windows'
-        run: strip target/release/filite
+        run: strip ${{ matrix.bin-path }}
       - name: Upload binary
         uses: actions/upload-artifact@v1
         with:
           name: ${{ runner.os }}
-          path: ${{ matrix.path || 'target/release/filite' }}
+          path: ${{ matrix.bin-path }}
+  build-pi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: armv7-unknown-linux-musleabihf
+          override: true
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: pi-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: pi-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v1
+        with:
+          path: target
+          key: pi-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build project
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target armv7-unknown-linux-musleabihf
+      - name: Strip binary
+        run: strip target/armv7-unknown-linux-musleabihf/filite
+      - name: Upload binary
+        uses: actions/upload-artifact@v1
+        with:
+          name: Pi
+          path: target/armv7-unknown-linux-musleabihf/filite
   checks:
     runs-on: ubuntu-latest
     steps:
@@ -47,6 +85,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          components: clippy, rustfmt
           override: true
       - uses: actions/cache@v1
         with:
@@ -60,20 +99,16 @@ jobs:
         with:
           path: target
           key: checks-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: rustup component add rustfmt
-      - run: rustup component add clippy
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all
       - name: Check for clippy warnings
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/clippy-check@v1
         with:
-          command: clippy
-          args: --all -- -D warnings
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --check
+          args: -- --check

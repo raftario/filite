@@ -1,5 +1,7 @@
 # filite
 
+> The README isn't representative of the current status of the `next` branch and will only be updated once the changes are stabilised.
+
 A simple, light and standalone pastebin, URL shortener and file-sharing service that hosts **fi**les, redirects **li**nks and stores **te**xts.
 
 [![GitHub Actions](https://github.com/raftario/filite/workflows/Build/badge.svg)](https://github.com/raftario/filite/actions?workflowID=Build)
