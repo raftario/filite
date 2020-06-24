@@ -63,17 +63,3 @@ impl Pool {
         builder
     }
 }
-
-#[macro_export]
-macro_rules! pool {
-    ($pool:expr) => {{
-        match $pool {
-            #[cfg(feature = "sqlite")]
-            $crate::db::Pool::Sqlite(p) => p,
-            #[cfg(feature = "postgres")]
-            $crate::db::Pool::Postgres(p) => p,
-            #[cfg(feature = "mysql")]
-            $crate::db::Pool::Mysql(p) => p,
-        }
-    }};
-}
