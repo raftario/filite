@@ -27,6 +27,9 @@ structopt = "0.3.15"
 tokio = { version = "0.2.21", features = ["blocking", "fs", "rt-core"] }
 warp = { version = "0.2.3", features = ["multipart"], default-features = false }
 
+# Makes cross-compiliing easier by statically linking to OpenSSL
+openssl-sys = { version = "0.9", features = ["vendored"] }
+
 [features]
 default = ["full"]
 lite = ["sqlite"]
