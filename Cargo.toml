@@ -3,30 +3,64 @@ name = "filite"
 version = "0.3.0"
 authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
-description = "A simple, light and standalone pastebin, URL shortener and file-sharing service"
+description = "A modular and standalone pastebin, URL shortener and file-sharing service"
 homepage = "https://github.com/raftario/filite"
 repository = "https://github.com/raftario/filite"
 readme = "README.md"
 keywords = [
     "file-sharing",
     "url-shortener",
-    "pastebin"
+    "pastebin",
 ]
 license = "MIT"
 
 [dependencies]
-dotenv = { version = "0.15.0", optional = true }
+anyhow = "1.0.31"
+cfg-if = "0.1.10"
 chrono = "0.4.11"
-env_logger = "0.7.1"
-envy = "0.4.1"
-log = "0.4.8"
-rusqlite = { version = "0.23.1", features = ["bundled", "chrono"] }
+log = { version = "0.4.8", features = ["serde"] }
 rust-argon2 = "0.8.2"
-serde = { version = "1.0.112", features = ["derive"] }
-tokio = { version = "0.2.21", features = ["blocking", "fs", "macros"] }
-toml = "0.5.6"
-warp = { version = "0.2.3", features = ["multipart", "tls"], default-features = false }
+serde = { version = "1.0.114", features = ["derive"] }
+serde_json = "1.0.55"
+sqlx = { version = "0.3.5", features = ["chrono", "runtime-tokio"], default-features = false }
+structopt = "0.3.15"
+tokio = { version = "0.2.21", features = ["blocking", "fs"] }
+warp = { version = "0.2.3", features = ["multipart"], default-features = false }
 
 [features]
-default = []
-dev = ["dotenv"]
+default = ["full"]
+lite = ["sqlite"]
+classic = [
+    "sqlite",
+    "threaded",
+    "highlight",
+]
+full = [
+    "sqlite",
+    "postgres",
+    "mysql",
+    "tls",
+    "threaded",
+    "analytics",
+    "highlight",
+]
+
+# Database backends
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+mysql = ["sqlx/mysql"]
+
+# TLS support for the database and web server
+tls = [
+    "sqlx/tls",
+    "warp/tls",
+]
+
+# Threaded runtime
+threaded = ["tokio/rt-threaded"]
+
+# Various analytics (no external services)
+analytics = []
+
+# Syntax highlighting
+highlight = []

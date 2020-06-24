@@ -71,8 +71,6 @@ jobs:
           use-cross: true
           command: build
           args: --release --target armv7-unknown-linux-musleabihf
-      - name: Strip binary
-        run: strip target/armv7-unknown-linux-musleabihf/release/filite
       - name: Upload binary
         uses: actions/upload-artifact@v1
         with:
