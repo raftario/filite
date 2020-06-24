@@ -2,11 +2,13 @@
 compile_error!("You need to select at least one database backend");
 
 mod config;
+mod db;
 mod logger;
 mod runtime;
 
 use anyhow::Error;
 use config::Config;
+use db::pool::Pool;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -60,12 +62,13 @@ fn main() -> Result<(), Error> {
     logger::init(&config.logger)?;
 
     let mut runtime = runtime::build(&config)?;
-    runtime.block_on(run(&config))?;
+    runtime.block_on(run(config))?;
 
     Ok(())
 }
 
-async fn run(_config: &Config) -> Result<(), Error> {
+async fn run(config: Config) -> Result<(), Error> {
+    let _pool = Pool::build(&config).await?;
     Ok(())
 }
 
