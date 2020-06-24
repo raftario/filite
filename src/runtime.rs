@@ -6,7 +6,7 @@ use tokio::runtime::{Builder, Runtime};
 #[cfg_attr(not(feature = "threaded"), allow(unused_variables))]
 pub fn build(config: &Config) -> Result<Runtime, Error> {
     let mut builder = Builder::new();
-    builder.basic_scheduler().enable_io();
+    builder.basic_scheduler().enable_all();
 
     #[cfg(feature = "threaded")]
     {
