@@ -1,5 +1,5 @@
+use crate::utils::DefaultExt;
 use anyhow::Error;
-use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -7,141 +7,103 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+fn log_level_is_info(level: &str) -> bool {
+    level.to_lowercase() == "info"
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct Config {
     pub port: u16,
     pub database_url: String,
 
-    #[serde(default)]
-    pub logger: LoggerConfig,
+    #[serde(skip_serializing_if = "log_level_is_info")]
+    pub log_level: String,
 
-    #[serde(default)]
+    #[serde(skip_serializing_if = "DefaultExt::is_default")]
     pub pool: PoolConfig,
 
     #[cfg(feature = "tls")]
-    #[serde(default)]
-    pub tls: TlsConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls: Option<TlsConfig>,
 
     #[cfg(feature = "threaded")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "DefaultExt::is_default")]
     pub threads: ThreadsConfig,
-
-    #[cfg(feature = "analytics")]
-    #[serde(default)]
-    pub analytics: AnalyticsConfig,
-
-    #[cfg(feature = "highlight")]
-    #[serde(default)]
-    pub highlight: HighlightConfig,
 }
 
-impl Config {
-    pub fn read(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let file = File::open(path)?;
-        let config = serde_json::from_reader(BufReader::new(file))?;
-        Ok(config)
-    }
-
-    pub fn write(path: impl AsRef<Path>) -> Result<(), Error> {
-        let config = Self {
+impl Default for Config {
+    fn default() -> Self {
+        Self {
             port: 80,
             database_url: {
                 cfg_if::cfg_if! {
                     if #[cfg(feature = "sqlite")] {
-                        "filite.db"
+                        "sqlite://filite.db"
                     } else if #[cfg(feature = "postgres")] {
                         "postgresql://localhost:5432/filite"
-                    } else if #[cfg(feature = "mysql")] {
-                        "mysql://localhost:3306/filite"
                     }
                 }
             }
             .to_owned(),
-            logger: Default::default(),
-            pool: Default::default(),
+
+            log_level: "info".to_owned(),
+
             #[cfg(feature = "tls")]
-            tls: Default::default(),
+            tls: None,
+
+            pool: Default::default(),
+
             #[cfg(feature = "threaded")]
             threads: Default::default(),
-            #[cfg(feature = "analytics")]
-            analytics: Default::default(),
-            #[cfg(feature = "highlight")]
-            highlight: Default::default(),
-        };
-        let file = File::create(path)?;
-        serde_json::to_writer_pretty(BufWriter::new(file), &config)?;
-        Ok(())
+        }
     }
 }
 
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct LoggerConfig {
-    pub console: LogLevel,
-    pub file: Option<FileLoggerConfig>,
-}
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileLoggerConfig {
-    #[serde(default)]
-    pub level: LogLevel,
-    pub path: PathBuf,
-}
-#[derive(Deserialize, Serialize)]
-pub struct LogLevel(pub LevelFilter);
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self(LevelFilter::Info)
-    }
+pub fn read(path: impl AsRef<Path>) -> Result<&'static Config, Error> {
+    let file = File::open(path)?;
+    let config: Config = serde_json::from_reader(BufReader::new(file))?;
+    Ok(&*Box::leak(Box::new(config)))
 }
 
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct PoolConfig {
-    pub min_size: Option<u32>,
-    pub max_size: Option<u32>,
-    pub connect_timeout: Option<u64>,
-    pub idle_timeout: Option<u64>,
-    pub max_lifetime: Option<u64>,
+pub fn write(path: impl AsRef<Path>) -> Result<(), Error> {
+    let config: Config = Default::default();
+    let file = File::create(path)?;
+    serde_json::to_writer_pretty(BufWriter::new(file), &config)?;
+    Ok(())
 }
 
 #[cfg(feature = "tls")]
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct TlsConfig {
-    pub cert: Option<PathBuf>,
-    pub key: Option<PathBuf>,
+    pub cert: PathBuf,
+    pub key: PathBuf,
+}
+
+#[derive(Debug, Deserialize, Serialize, Default, PartialEq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct PoolConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_connections: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_connections: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect_timeout: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub idle_timeout: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_lifetime: Option<u64>,
 }
 
 #[cfg(feature = "threaded")]
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[derive(Debug, Deserialize, Serialize, Default, PartialEq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct ThreadsConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub core_threads: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_threads: Option<usize>,
-}
-
-#[cfg(feature = "analytics")]
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default)]
-pub struct AnalyticsConfig {
-    pub views: bool,
-}
-
-#[cfg(feature = "highlight")]
-#[derive(Deserialize, Serialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct HighlightConfig {
-    pub theme: String,
-    pub languages: Vec<String>,
-}
-#[cfg(feature = "highlight")]
-impl Default for HighlightConfig {
-    fn default() -> Self {
-        Self {
-            theme: "default".to_owned(),
-            languages: Default::default(),
-        }
-    }
 }

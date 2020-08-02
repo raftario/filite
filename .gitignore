@@ -1,9 +1,7 @@
 target/
 
-.env
-
 .vscode/
 .idea/
 
-filite.toml
 filite.json
+.env

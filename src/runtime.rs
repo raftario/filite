@@ -1,8 +1,8 @@
 use crate::config::Config;
 use anyhow::Error;
-use log::debug;
 use tokio::runtime::{Builder, Runtime};
 
+#[tracing::instrument(level = "debug")]
 #[cfg_attr(not(feature = "threaded"), allow(unused_variables))]
 pub fn build(config: &Config) -> Result<Runtime, Error> {
     let mut builder = Builder::new();
@@ -21,6 +21,5 @@ pub fn build(config: &Config) -> Result<Runtime, Error> {
         }
     }
 
-    debug!("Building Tokio runtime");
     Ok(builder.build()?)
 }
