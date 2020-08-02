@@ -13,6 +13,7 @@ use config::Config;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing_subscriber::fmt::format::FmtSpan;
+use warp::{Filter, Reply};
 
 #[derive(StructOpt)]
 #[structopt(author, about)]
@@ -54,8 +55,25 @@ fn main() -> Result<(), Error> {
 }
 
 async fn run(config: &'static Config) -> Result<(), Error> {
-    let _pool = db::pool::build(&config).await?;
+    let pool = db::pool::build(&config).await?;
     Ok(())
+}
+
+async fn serve(
+    filter: impl Filter<Extract = (impl Reply,)> + Send + Sync + Clone + 'static,
+    config: &Config,
+) {
+    #[cfg(feature = "tls")]
+    if let Some(tls_config) = &config.tls {
+        return warp::serve(filter)
+            .tls()
+            .cert_path(&tls_config.cert)
+            .key_path(&tls_config.key)
+            .run(([127, 0, 0, 1], config.port))
+            .await;
+    }
+
+    warp::serve(filter).run(([127, 0, 0, 1], config.port)).await
 }
 
 fn init_config(path: Option<&PathBuf>) -> Result<(), Error> {
