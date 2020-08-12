@@ -1,9 +1,10 @@
 mod auth;
 mod config;
 mod db;
+mod reject;
 mod routes;
 mod runtime;
-mod utils;
+mod util;
 
 use anyhow::Error;
 use config::Config;
