@@ -1,0 +1,89 @@
+name: Build
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            bin: target/release/filite
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: target/release/filite.exe
+          - os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: target/release/filite
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: ${{ matrix.target }}
+          override: true
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Strip binary
+        if: runner.os != 'Windows'
+        run: strip ${{ matrix.bin }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: filite-${{ matrix.target }}
+          path: ${{ matrix.bin }}
+
+  build-armv7:
+    name: Build (ARMv7)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: armv7-unknown-linux-musleabihf
+          override: true
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: build-armv7-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build binary
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target armv7-unknown-linux-musleabihf
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: filite-armv7-unknown-linux-musleabihf
+          path: target/armv7-unknown-linux-musleabihf/release/filite
