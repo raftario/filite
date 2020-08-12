@@ -1,5 +1,5 @@
 use crate::utils::DefaultExt;
-use anyhow::Error;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -7,8 +7,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn log_level_is_info(level: &str) -> bool {
-    level.to_lowercase() == "info"
+#[inline]
+fn default_log_level() -> String {
+    "info,sqlx=warn".to_owned()
+}
+#[inline]
+fn log_level_is_default(level: &str) -> bool {
+    level.to_lowercase() == default_log_level()
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -16,18 +21,13 @@ fn log_level_is_info(level: &str) -> bool {
 pub struct Config {
     pub port: u16,
     pub database_url: String,
-
-    #[serde(skip_serializing_if = "log_level_is_info")]
+    pub files_dir: PathBuf,
+    #[serde(skip_serializing_if = "log_level_is_default")]
     pub log_level: String,
-
     #[serde(skip_serializing_if = "DefaultExt::is_default")]
     pub pool: PoolConfig,
-
-    #[cfg(feature = "tls")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsConfig>,
-
-    #[cfg(feature = "threaded")]
     #[serde(skip_serializing_if = "DefaultExt::is_default")]
     pub threads: ThreadsConfig,
 }
@@ -36,44 +36,29 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             port: 80,
-            database_url: {
-                cfg_if::cfg_if! {
-                    if #[cfg(feature = "sqlite")] {
-                        "sqlite://filite.db"
-                    } else if #[cfg(feature = "postgres")] {
-                        "postgresql://localhost:5432/filite"
-                    }
-                }
-            }
-            .to_owned(),
-
-            log_level: "info".to_owned(),
-
-            #[cfg(feature = "tls")]
+            database_url: "filite.db".to_owned(),
+            files_dir: PathBuf::from("files"),
+            log_level: default_log_level(),
             tls: None,
-
             pool: Default::default(),
-
-            #[cfg(feature = "threaded")]
             threads: Default::default(),
         }
     }
 }
 
-pub fn read(path: impl AsRef<Path>) -> Result<&'static Config, Error> {
+pub fn read(path: impl AsRef<Path>) -> Result<&'static Config> {
     let file = File::open(path)?;
     let config: Config = serde_json::from_reader(BufReader::new(file))?;
     Ok(&*Box::leak(Box::new(config)))
 }
 
-pub fn write(path: impl AsRef<Path>) -> Result<(), Error> {
+pub fn write(path: impl AsRef<Path>) -> Result<()> {
     let config: Config = Default::default();
     let file = File::create(path)?;
     serde_json::to_writer_pretty(BufWriter::new(file), &config)?;
     Ok(())
 }
 
-#[cfg(feature = "tls")]
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct TlsConfig {
@@ -98,7 +83,6 @@ pub struct PoolConfig {
     pub max_lifetime: Option<u64>,
 }
 
-#[cfg(feature = "threaded")]
 #[derive(Debug, Deserialize, Serialize, Default, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct ThreadsConfig {

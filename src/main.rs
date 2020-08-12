@@ -1,10 +1,6 @@
-#[cfg(not(any(feature = "fi", feature = "li", feature = "te")))]
-compile_error!("You need to select at least one data type");
-#[cfg(not(any(feature = "sqlite", feature = "postgres", feature = "mysql")))]
-compile_error!("You need to select at least one database backend");
-
 mod config;
 mod db;
+mod routes;
 mod runtime;
 mod utils;
 
@@ -63,17 +59,17 @@ async fn serve(
     filter: impl Filter<Extract = (impl Reply,)> + Send + Sync + Clone + 'static,
     config: &Config,
 ) {
-    #[cfg(feature = "tls")]
-    if let Some(tls_config) = &config.tls {
-        return warp::serve(filter)
-            .tls()
-            .cert_path(&tls_config.cert)
-            .key_path(&tls_config.key)
-            .run(([127, 0, 0, 1], config.port))
-            .await;
+    match &config.tls {
+        Some(tls_config) => {
+            warp::serve(filter)
+                .tls()
+                .cert_path(&tls_config.cert)
+                .key_path(&tls_config.key)
+                .run(([127, 0, 0, 1], config.port))
+                .await
+        }
+        None => warp::serve(filter).run(([127, 0, 0, 1], config.port)).await,
     }
-
-    warp::serve(filter).run(([127, 0, 0, 1], config.port)).await
 }
 
 fn init_config(path: Option<&PathBuf>) -> Result<(), Error> {

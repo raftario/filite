@@ -1,0 +1,353 @@
+{
+  "db": "SQLite",
+  "0fa193d147d714b9cbd4efc9f4aef2d0603089dfd0a5a1644db38b2383cb3d75": {
+    "query": "SELECT id, password, role as \"role: Role\" FROM users WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "role: Role",
+          "ordinal": 2,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "2939cc3de5feaa6024500b980f0bc425cf15ca0e08a47397d2ce56a2d8ca3aaf": {
+    "query": "SELECT id, ty as \"ty: Type\", val, creator, created FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "ty: Type",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "val",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "creator",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 4,
+          "type_info": "Datetime"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "2bded90766f48d62b0426cf9fe55477232add7cd45d15f613feada68fc11e80e": {
+    "query": "SELECT id FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "5f0027d087a1932b987e697800210f9267b5730e002ef14bf79841ea790c3ab5": {
+    "query": "SELECT * FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "ty",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "val",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "creator",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 4,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "visibility",
+          "ordinal": 5,
+          "type_info": "Int64"
+        },
+        {
+          "name": "views",
+          "ordinal": 6,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "79f48ed4fbf70048313a8ef5b665bc371ed16957e7e7186fb4817029931847ab": {
+    "query": "SELECT id, password, role FROM users WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "role",
+          "ordinal": 2,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "7fd8490787f6136611e1e30fc87177c7f6ec8ce072539efe6963155107458ba4": {
+    "query": "SELECT id, ty as \"ty: Type\", val, creator, created, visibility as \"visibility: Visibility\" FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "ty: Type",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "val",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "creator",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 4,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "visibility: Visibility",
+          "ordinal": 5,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "843923b9a0257cf80f1dff554e7dc8fdfc05f489328e8376513124dfb42996e3": {
+    "query": "SELECT * FROM users WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "role",
+          "ordinal": 2,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        true,
+        false,
+        false
+      ]
+    }
+  },
+  "a0cf6aac396dc7c11b86d885fdb5cbc78c40344ad134a83136d19189d5877538": {
+    "query": "SELECT id, ty as \"ty: Type\", val, creator, created, visibility as \"visibility: Visibility\", views FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "ty: Type",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "val",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "creator",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 4,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "visibility: Visibility",
+          "ordinal": 5,
+          "type_info": "Int64"
+        },
+        {
+          "name": "views",
+          "ordinal": 6,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": {
+    "query": "",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": []
+    }
+  },
+  "e7baf3f2538368ddc02bf7712da5deaf4c19969d69181717033f9b29087ebf8b": {
+    "query": "SELECT id, ty as \"ty: Type\" FROM filite WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "ty: Type",
+          "ordinal": 1,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "fac905277f1bd32c350c4fa7d3636ec79fb74c242f2a3bd4b4e52a10fcd0d0ae": {
+    "query": "UPDATE filite SET views = views + 1 WHERE id = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  }
+}

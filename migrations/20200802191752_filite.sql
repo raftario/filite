@@ -1,11 +1,11 @@
 CREATE TABLE filite (
-    id varchar(32) PRIMARY KEY,
-    ty smallint NOT NULL,
+    id varchar(32) NOT NULL PRIMARY KEY,
+    ty int NOT NULL,
     val text NOT NULL,
 
-    creator varchar(32) NOT NULL REFERENCES users(user),
+    creator varchar(32) NOT NULL REFERENCES users(id),
     created timestamp NOT NULL,
 
-    visibility smallint NOT NULL,
-    views int NOT NULL DEFAULT 0
+    visibility int NOT NULL,
+    views int NOT NULL
 );

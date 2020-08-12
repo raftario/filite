@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    user varchar(32) PRIMARY KEY,
+    id varchar(32) NOT NULL PRIMARY KEY,
     password varchar(256) NOT NULL,
-    role smallint NOT NULL
+    role int NOT NULL
 );

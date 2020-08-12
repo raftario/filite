@@ -17,53 +17,18 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0.32"
 askama = "0.10.3"
-cfg-if = "0.1.10"
 chrono = { version = "0.4.13", features = ["serde"] }
 futures = "0.3.5"
 rust-argon2 = "0.8.2"
-serde = { version = "1.0.114", features = ["derive"] }
+serde = { version = "1.0.115", features = ["derive"] }
 serde_json = "1.0.57"
-sqlx = { version = "0.4.0-beta.1", features = ["any", "chrono", "macros", "migrate", "runtime-tokio"], default-features = false }
-structopt = "0.3.15"
+sqlx = { version = "0.4.0-beta.1", features = ["chrono", "macros", "migrate", "offline", "runtime-tokio", "sqlite"], default-features = false }
+structopt = "0.3.16"
 tokio = { version = "0.2.22", features = ["blocking", "fs", "rt-core"] }
-tracing = "0.1.18"
+tracing = "0.1.19"
 tracing-futures = "0.2.4"
-tracing-subscriber = "0.2.10"
-warp = { version = "0.2.4", default-features = false }
+tracing-subscriber = "0.2.11"
+warp = { version = "0.2.4", features = ["tls"], default-features = false }
 
-# Makes cross-compiliing easier by statically linking to OpenSSL
 [target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies]
 openssl = { version = "*", features = ["vendored"] }
-
-[features]
-default = ["full"]
-
-# Presets
-lite = ["filite", "sqlite"]
-full = [
-    "filite",
-    "sqlite",
-    "postgres",
-    "tls",
-    "threaded",
-    "analytics",
-]
-
-# Data types
-fi = []
-li = []
-te = []
-filite = ["fi", "li", "te"]
-
-# Database backends
-sqlite = ["sqlx/sqlite"]
-postgres = ["sqlx/postgres"]
-
-# TLS support
-tls = ["warp/tls"]
-
-# Threaded runtime
-threaded = ["tokio/rt-threaded"]
-
-# Track views
-analytics = []

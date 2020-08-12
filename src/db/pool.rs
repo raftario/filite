@@ -1,11 +1,11 @@
 use crate::config::Config;
-use anyhow::Error;
-use sqlx::any::{AnyPool, AnyPoolOptions};
+use anyhow::Result;
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::time::Duration;
 
 #[tracing::instrument(level = "debug")]
-pub async fn build(config: &Config) -> Result<&'static AnyPool, Error> {
-    let mut options: AnyPoolOptions = Default::default();
+pub async fn build(config: &Config) -> Result<&'static SqlitePool> {
+    let mut options: SqlitePoolOptions = Default::default();
 
     if let Some(ms) = config.pool.max_connections {
         options = options.max_connections(ms);
@@ -25,7 +25,9 @@ pub async fn build(config: &Config) -> Result<&'static AnyPool, Error> {
         options = options.max_lifetime(Duration::from_millis(ml));
     }
 
-    let pool = options.connect(&config.database_url).await?;
+    let pool = options
+        .connect(&format!("sqlite://{}", config.database_url))
+        .await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     Ok(&*Box::leak(Box::new(pool)))
