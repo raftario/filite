@@ -6,7 +6,6 @@ mod utils;
 
 use anyhow::Error;
 use config::Config;
-use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::{Filter, Reply};
@@ -15,11 +14,14 @@ use warp::{Filter, Reply};
 #[structopt(author, about)]
 struct Opt {
     /// Configuration file to use
-    ///
-    /// If unspecified, will look for a filite.json
-    /// file in the current working directory.
-    #[structopt(short, long, name = "FILE")]
-    config: Option<PathBuf>,
+    #[structopt(
+        short,
+        long,
+        name = "FILE",
+        env = "FILITE_CONFIG",
+        default_value = "filite.json"
+    )]
+    config: String,
 
     #[structopt(subcommand)]
     command: Option<Command>,
@@ -33,11 +35,14 @@ enum Command {
 
 fn main() -> Result<(), Error> {
     let args: Opt = Opt::from_args();
+
     if let Some(Command::Init) = &args.command {
-        return init_config(args.config.as_ref());
+        config::write(&args.config)?;
+        println!("Default config written");
+        return Ok(());
     }
 
-    let config = config::read(args.config.unwrap_or_else(|| PathBuf::from("filite.json")))?;
+    let config = config::read(&args.config)?;
 
     tracing_subscriber::fmt()
         .with_env_filter(&config.log_level)
@@ -70,10 +75,4 @@ async fn serve(
         }
         None => warp::serve(filter).run(([127, 0, 0, 1], config.port)).await,
     }
-}
-
-fn init_config(path: Option<&PathBuf>) -> Result<(), Error> {
-    config::write(path.unwrap_or(&PathBuf::from("filite.json")))?;
-    println!("Default config written");
-    Ok(())
 }
