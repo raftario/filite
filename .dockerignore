@@ -1,0 +1,8 @@
+target/
+
+.vscode/
+.idea/
+
+filite.json
+.env
+*.db
