@@ -1,7 +1,7 @@
 use crate::{
     config::{Config, PasswordConfig},
-    db::{self, User},
-    reject::{self, TryExt},
+    db::User,
+    reject::TryExt,
 };
 use anyhow::Result;
 use rand::Rng;
@@ -34,10 +34,10 @@ pub fn auth_required(
 #[tracing::instrument(level = "debug")]
 async fn user(header: String, db: &Db, config: &Config) -> Result<User, Rejection> {
     if &header[..5] != "Basic" {
-        return Err(reject::unauthorized());
+        return Err(crate::reject::unauthorized());
     }
 
-    let decoded = task::block_in_place(move || base64::decode(&header[6..])).or_401()?;
+    let decoded = base64::decode(&header[6..]).or_401()?;
 
     let (user, password) = {
         let mut split = None;
@@ -52,16 +52,27 @@ async fn user(header: String, db: &Db, config: &Config) -> Result<User, Rejectio
         (std::str::from_utf8(u).or_401()?, p)
     };
 
-    let user = db::user(user, db).or_500()?.or_401()?;
+    let user = crate::db::user(user, db).or_500()?.or_401()?;
     if !verify(&user.password_hash, password, &config.password).or_500()? {
-        return Err(reject::unauthorized());
+        return Err(crate::reject::unauthorized());
     }
 
     Ok(user)
 }
 
+#[tracing::instrument(level = "debug", skip(encoded, password))]
+fn verify(encoded: &str, password: &[u8], config: &PasswordConfig) -> Result<bool> {
+    let res = match &config.secret {
+        Some(s) => task::block_in_place(move || {
+            argon2::verify_encoded_ext(encoded, password, s.as_bytes(), &[])
+        })?,
+        None => task::block_in_place(move || argon2::verify_encoded(encoded, password))?,
+    };
+    Ok(res)
+}
+
 #[tracing::instrument(level = "debug", skip(password))]
-fn hash(password: &[u8], config: &PasswordConfig) -> Result<String> {
+pub fn hash(password: &[u8], config: &PasswordConfig) -> Result<String> {
     let mut cfg = argon2::Config::default();
     if let Some(hl) = config.hash_length {
         cfg.hash_length = hl;
@@ -79,22 +90,9 @@ fn hash(password: &[u8], config: &PasswordConfig) -> Result<String> {
         cfg.secret = s;
     }
 
-    let hashed = task::block_in_place(move || {
-        let mut salt = vec![0; config.salt_length.unwrap_or(16)];
-        rand::thread_rng().fill(&mut salt[..]);
+    let mut salt = vec![0; config.salt_length.unwrap_or(16)];
+    rand::thread_rng().fill(&mut salt[..]);
 
-        argon2::hash_encoded(password, &salt[..], &cfg)
-    })?;
+    let hashed = argon2::hash_encoded(password, &salt[..], &cfg)?;
     Ok(hashed)
-}
-
-#[tracing::instrument(level = "debug", skip(encoded, password))]
-fn verify(encoded: &str, password: &[u8], config: &PasswordConfig) -> Result<bool> {
-    let res = match &config.secret {
-        Some(s) => task::block_in_place(move || {
-            argon2::verify_encoded_ext(encoded, password, s.as_bytes(), &[])
-        })?,
-        None => task::block_in_place(move || argon2::verify_encoded(encoded, password))?,
-    };
-    Ok(res)
 }
