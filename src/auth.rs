@@ -1,21 +1,21 @@
 use crate::{
-    db,
-    db::models::User,
+    config::{Config, PasswordConfig},
+    db::{self, User},
     reject::{self, TryExt},
 };
 use anyhow::Result;
-use argon2::Config;
 use rand::Rng;
-use sqlx::SqlitePool;
+use sled::Db;
 use tokio::task;
 use warp::{Filter, Rejection};
 
 pub fn auth_optional(
-    pool: &'static SqlitePool,
+    db: &'static Db,
+    config: &'static Config,
 ) -> impl Filter<Extract = (Option<User>,), Error = Rejection> + Copy + Send + Sync + 'static {
     warp::header::optional("Authorization").and_then(move |header| async move {
         match header {
-            Some(h) => match user(h, pool).await {
+            Some(h) => match user(h, db, config).await {
                 Ok(u) => Ok(Some(u)),
                 Err(e) => Err(e),
             },
@@ -25,18 +25,19 @@ pub fn auth_optional(
 }
 
 pub fn auth_required(
-    pool: &'static SqlitePool,
+    db: &'static Db,
+    config: &'static Config,
 ) -> impl Filter<Extract = (User,), Error = Rejection> + Copy + Send + Sync + 'static {
-    warp::header::header("Authorization").and_then(move |header| user(header, pool))
+    warp::header::header("Authorization").and_then(move |header| user(header, db, config))
 }
 
 #[tracing::instrument(level = "debug")]
-async fn user(header: String, pool: &SqlitePool) -> Result<User, Rejection> {
+async fn user(header: String, db: &Db, config: &Config) -> Result<User, Rejection> {
     if &header[..5] != "Basic" {
         return Err(reject::unauthorized());
     }
 
-    let decoded = base64::decode(&header[6..]).or_401()?;
+    let decoded = task::block_in_place(move || base64::decode(&header[6..])).or_401()?;
 
     let (user, password) = {
         let mut split = None;
@@ -51,29 +52,49 @@ async fn user(header: String, pool: &SqlitePool) -> Result<User, Rejection> {
         (std::str::from_utf8(u).or_401()?, p)
     };
 
-    let user = db::user(user, pool).await.or_500()?.or_401()?;
-    if !verify(user.password.clone(), password.to_owned())
-        .await
-        .or_500()?
-    {
+    let user = db::user(user, db).or_500()?.or_401()?;
+    if !verify(&user.password_hash, password, &config.password).or_500()? {
         return Err(reject::unauthorized());
     }
 
     Ok(user)
 }
 
-// TODO: Allow custom configuration
 #[tracing::instrument(level = "debug", skip(password))]
-async fn hash(password: Vec<u8>) -> Result<String> {
-    let config = Config::default();
-    Ok(task::spawn_blocking(move || {
-        let salt: [u8; 16] = rand::thread_rng().gen();
-        argon2::hash_encoded(&password, &salt[..], &config)
-    })
-    .await??)
+fn hash(password: &[u8], config: &PasswordConfig) -> Result<String> {
+    let mut cfg = argon2::Config::default();
+    if let Some(hl) = config.hash_length {
+        cfg.hash_length = hl;
+    }
+    if let Some(l) = config.lanes {
+        cfg.lanes = l;
+    }
+    if let Some(mc) = config.memory_cost {
+        cfg.mem_cost = mc;
+    }
+    if let Some(tc) = config.time_cost {
+        cfg.time_cost = tc;
+    }
+    if let Some(s) = config.secret.as_ref().map(|s| s.as_bytes()) {
+        cfg.secret = s;
+    }
+
+    let hashed = task::block_in_place(move || {
+        let mut salt = vec![0; config.salt_length.unwrap_or(16)];
+        rand::thread_rng().fill(&mut salt[..]);
+
+        argon2::hash_encoded(password, &salt[..], &cfg)
+    })?;
+    Ok(hashed)
 }
 
 #[tracing::instrument(level = "debug", skip(encoded, password))]
-async fn verify(encoded: String, password: Vec<u8>) -> Result<bool> {
-    Ok(task::spawn_blocking(move || argon2::verify_encoded(&encoded, &password)).await??)
+fn verify(encoded: &str, password: &[u8], config: &PasswordConfig) -> Result<bool> {
+    let res = match &config.secret {
+        Some(s) => task::block_in_place(move || {
+            argon2::verify_encoded_ext(encoded, password, s.as_bytes(), &[])
+        })?,
+        None => task::block_in_place(move || argon2::verify_encoded(encoded, password))?,
+    };
+    Ok(res)
 }

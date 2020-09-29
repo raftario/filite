@@ -51,14 +51,15 @@ fn main() -> Result<(), Error> {
         .with_span_events(FmtSpan::CLOSE)
         .init();
 
-    let mut runtime = runtime::build(&config)?;
+    let db = db::connect(&config.database)?;
+
+    let mut runtime = runtime::build(&config.runtime)?;
     runtime.block_on(run(config))?;
 
     Ok(())
 }
 
 async fn run(config: &'static Config) -> Result<(), Error> {
-    let pool = db::pool::build(&config).await?;
     Ok(())
 }
 

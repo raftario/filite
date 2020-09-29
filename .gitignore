@@ -4,5 +4,3 @@ target/
 .idea/
 
 filite.json
-.env
-*.db

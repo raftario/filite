@@ -6,7 +6,7 @@ COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 
 RUN apk update \
-    && apk add --no-cache make musl-dev perl \
+    && apk add --no-cache musl-dev \
     && rm -rf /var/cache/apk/*
 
 RUN cargo build --release
