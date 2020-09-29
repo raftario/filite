@@ -16,7 +16,13 @@ pub fn connect(config: &DatabaseConfig) -> Result<&'static Db> {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Filite {
+pub struct Filite {
+    owner: String,
+    inner: FiliteInner,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum FiliteInner {
     File { data: Vec<u8>, mime: String },
     Link { location: String },
     Text { data: String },
