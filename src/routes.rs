@@ -6,7 +6,10 @@ use crate::{
 use bytes::Bytes;
 use sled::Db;
 use warp::reply::Response;
-use warp::{http::Uri, Filter, Rejection, Reply};
+use warp::{
+    http::{StatusCode, Uri},
+    Filter, Rejection, Reply,
+};
 
 pub fn handler(
     config: &'static Config,
@@ -20,14 +23,14 @@ pub fn handler(
         .and(warp::post())
         .and(crate::auth::required(db, config))
         .and(warp::body::bytes())
-        .and(warp::header("Content-Type"))
+        .and(warp::header::optional("Content-Type"))
         .and(warp::header::optional("X-ID-Length"))
         .and_then(move |user, data, mime, len| post_file(user, data, mime, len, db));
     let put_file = warp::path!("f" / String)
         .and(warp::put())
         .and(crate::auth::required(db, config))
         .and(warp::body::bytes())
-        .and(warp::header("Content-Type"))
+        .and(warp::header::optional("Content-Type"))
         .and_then(move |id, user, data, mime| put_file(id, user, data, mime, db));
 
     let post_link = warp::path!("l")
@@ -88,7 +91,7 @@ async fn filite(id: String, db: &Db) -> Result<impl Reply, Rejection> {
 async fn post_file(
     user: User,
     data: Bytes,
-    mime: String,
+    mime: Option<String>,
     len: Option<usize>,
     db: &Db,
 ) -> Result<impl Reply, Rejection> {
@@ -101,13 +104,19 @@ async fn put_file(
     id: String,
     user: User,
     data: Bytes,
-    mime: String,
+    mime: Option<String>,
     db: &Db,
 ) -> Result<impl Reply, Rejection> {
-    crate::db::insert_file(&id, user.id, data.to_vec(), mime, db)
-        .or_500()?
-        .or_409()?;
-    Ok(id)
+    crate::db::insert_file(
+        &id,
+        user.id,
+        data.to_vec(),
+        mime.unwrap_or_else(|| "application/octet-stream".to_owned()),
+        db,
+    )
+    .or_500()?
+    .or_409()?;
+    Ok(warp::reply::with_status(id, StatusCode::CREATED))
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -126,7 +135,7 @@ async fn put_link(id: String, user: User, location: Uri, db: &Db) -> Result<impl
     crate::db::insert_link(&id, user.id, location.to_string(), db)
         .or_500()?
         .or_409()?;
-    Ok(id)
+    Ok(warp::reply::with_status(id, StatusCode::CREATED))
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -145,5 +154,5 @@ async fn put_text(id: String, user: User, data: String, db: &Db) -> Result<impl 
     crate::db::insert_text(&id, user.id, data, db)
         .or_500()?
         .or_409()?;
-    Ok(id)
+    Ok(warp::reply::with_status(id, StatusCode::CREATED))
 }

@@ -31,7 +31,7 @@ pub fn required(
     warp::header::header("Authorization").and_then(move |header| user(header, db, config))
 }
 
-#[tracing::instrument(level = "debug")]
+#[tracing::instrument(level = "debug", skip(db))]
 async fn user(header: String, db: &Db, config: &Config) -> Result<User, Rejection> {
     if &header[..5] != "Basic" {
         return Err(crate::reject::unauthorized());

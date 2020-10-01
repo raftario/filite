@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use sled::Db;
+use std::fmt;
 use tokio::task;
 
 #[tracing::instrument(level = "debug")]
@@ -171,11 +172,20 @@ pub fn random_id(length: usize, db: &Db) -> Result<String> {
     })
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct User {
     pub id: String,
     pub admin: bool,
     pub password_hash: String,
+}
+
+impl fmt::Debug for User {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("User")
+            .field("id", &self.id)
+            .field("admin", &self.admin)
+            .finish()
+    }
 }
 
 #[derive(Deserialize, Serialize)]

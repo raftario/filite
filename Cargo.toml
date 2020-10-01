@@ -28,7 +28,7 @@ serde = { version = "1.0.116", features = ["derive"] }
 serde_json = "1.0.57"
 sled = "0.34.4"
 structopt = "0.3.18"
-tokio = { version = "0.2.22", features = ["blocking", "fs", "rt-threaded"] }
+tokio = { version = "0.2.22", features = ["blocking", "fs", "macros", "rt-threaded"] }
 tracing = "0.1.19"
 tracing-futures = "0.2.4"
 tracing-subscriber = "0.2.12"
