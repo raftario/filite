@@ -1,4 +1,4 @@
-name: Build
+name: Docker
 on: push
 
 jobs:
@@ -8,7 +8,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - id: prepare
+      - id: prep
         run: |
           DOCKER_IMAGE=ghcr.io/${{ github.repository_owner }}/filite
           VERSION=noop
