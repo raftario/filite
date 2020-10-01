@@ -11,6 +11,7 @@ mod tests;
 
 use anyhow::Error;
 use config::Config;
+use sled::Db;
 use structopt::StructOpt;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::{Filter, Reply};
@@ -57,12 +58,8 @@ fn main() -> Result<(), Error> {
     let db = db::connect(&config.database)?;
 
     let mut runtime = runtime::build(&config.runtime)?;
-    runtime.block_on(run(config))?;
+    runtime.block_on(serve(routes::handler(config, db), config));
 
-    Ok(())
-}
-
-async fn run(config: &'static Config) -> Result<(), Error> {
     Ok(())
 }
 

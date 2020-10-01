@@ -6,7 +6,7 @@ use warp::{http::Uri, Filter, Rejection, Reply};
 pub fn handler(
     config: &'static Config,
     db: &'static Db,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Copy + Send + Sync + 'static {
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Copy + Send + Sync + 'static {
     let filite = warp::path!(String)
         .and(warp::get())
         .and_then(move |id| filite(id, db));
