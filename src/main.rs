@@ -11,7 +11,6 @@ mod tests;
 
 use anyhow::Error;
 use config::Config;
-use sled::Db;
 use structopt::StructOpt;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::{Filter, Reply};

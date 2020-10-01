@@ -41,7 +41,7 @@ impl Config {
         "info".to_owned()
     }
     #[inline]
-    fn log_level_is_default(level: &String) -> bool {
+    fn log_level_is_default(level: &str) -> bool {
         level.to_lowercase() == Self::default_log_level()
     }
 }

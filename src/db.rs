@@ -18,10 +18,10 @@ pub fn connect(config: &DatabaseConfig) -> Result<&'static Db> {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Filite {
-    owner: String,
-    creation: DateTime<Utc>,
-    inner: FiliteInner,
-    views: usize,
+    pub owner: String,
+    pub creation: DateTime<Utc>,
+    pub inner: FiliteInner,
+    pub views: usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

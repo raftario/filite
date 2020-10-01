@@ -1,6 +1,11 @@
-use crate::{config::Config, db::User, reject::TryExt};
+use crate::{
+    config::Config,
+    db::{Filite, FiliteInner, User},
+    reject::TryExt,
+};
 use bytes::Bytes;
 use sled::Db;
+use warp::reply::Response;
 use warp::{http::Uri, Filter, Rejection, Reply};
 
 pub fn handler(
@@ -58,7 +63,25 @@ pub fn handler(
         .or(put_text)
 }
 
-async fn filite(id: String, db: &Db) -> Result<impl Reply, Rejection> {}
+async fn filite(id: String, db: &Db) -> Result<impl Reply, Rejection> {
+    impl Reply for Filite {
+        fn into_response(self) -> Response {
+            match self.inner {
+                FiliteInner::File { data, mime } => {
+                    warp::reply::with_header(data, "Content-Type", mime).into_response()
+                }
+                FiliteInner::Link { location } => {
+                    warp::redirect::temporary(Uri::from_maybe_shared(location).unwrap_or_default())
+                        .into_response()
+                }
+                FiliteInner::Text { data } => data.into_response(),
+            }
+        }
+    }
+
+    let filite = crate::db::filite(&id, true, db).or_500()?.or_404()?;
+    Ok(filite)
+}
 
 async fn post_file(
     user: User,
