@@ -5,10 +5,10 @@ use crate::{
 };
 use bytes::Bytes;
 use sled::Db;
-use warp::reply::Response;
 use warp::{
     http::{StatusCode, Uri},
-    Filter, Rejection, Reply,
+    reply::{Reply, Response},
+    Filter, Rejection,
 };
 
 pub fn handler(
