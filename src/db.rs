@@ -60,6 +60,7 @@ fn filite_inc(id: &str, db: &Db) -> Result<Option<Filite>> {
         Some(b) => {
             let mut f: Filite = tryy!(bincode::deserialize(b), b, filite);
             f.views += 1;
+
             let b = tryy!(bincode::serialize(&f), b, filite);
             filite = Ok(Some(f));
             Some(b)
@@ -78,19 +79,26 @@ fn filite_noinc(id: &str, db: &Db) -> Result<Option<Filite>> {
     Ok(Some(filite))
 }
 
-fn insert_filite(id: &str, filite: Filite, db: &Db) -> Result<bool> {
+fn insert_filite(id: &str, filite: Filite, db: &Db) -> Result<Option<Filite>> {
     task::block_in_place(move || {
         if db.contains_key(id)? {
-            return Ok(false);
+            return Ok(None);
         }
+
         let bytes = bincode::serialize(&filite)?;
         db.insert(id, bytes)?;
-        Ok(true)
+        Ok(Some(filite))
     })
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn insert_file(id: &str, owner: String, data: Vec<u8>, mime: String, db: &Db) -> Result<bool> {
+pub fn insert_file(
+    id: &str,
+    owner: String,
+    data: Vec<u8>,
+    mime: String,
+    db: &Db,
+) -> Result<Option<Filite>> {
     insert_filite(
         id,
         Filite {
@@ -104,7 +112,7 @@ pub fn insert_file(id: &str, owner: String, data: Vec<u8>, mime: String, db: &Db
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn insert_link(id: &str, owner: String, location: String, db: &Db) -> Result<bool> {
+pub fn insert_link(id: &str, owner: String, location: String, db: &Db) -> Result<Option<Filite>> {
     insert_filite(
         id,
         Filite {
@@ -118,7 +126,7 @@ pub fn insert_link(id: &str, owner: String, location: String, db: &Db) -> Result
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn insert_text(id: &str, owner: String, data: String, db: &Db) -> Result<bool> {
+pub fn insert_text(id: &str, owner: String, data: String, db: &Db) -> Result<Option<Filite>> {
     insert_filite(
         id,
         Filite {
@@ -132,6 +140,21 @@ pub fn insert_text(id: &str, owner: String, data: String, db: &Db) -> Result<boo
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
+pub fn delete_filite(id: &str, user: &User, db: &Db) -> Result<Option<Filite>> {
+    task::block_in_place(move || match filite_noinc(id, db)? {
+        Some(f) => {
+            if user.admin || f.owner == user.id {
+                db.remove(id)?;
+                Ok(Some(f))
+            } else {
+                Ok(None)
+            }
+        }
+        None => Ok(None),
+    })
+}
+
+#[tracing::instrument(level = "debug", skip(db))]
 pub fn random_id(length: usize, db: &Db) -> Result<String> {
     task::block_in_place(move || {
         let mut id;
@@ -140,6 +163,7 @@ pub fn random_id(length: usize, db: &Db) -> Result<String> {
                 .sample_iter(Alphanumeric)
                 .take(length)
                 .collect();
+
             if !db.contains_key(&id)? {
                 break Ok(id);
             }
@@ -149,8 +173,15 @@ pub fn random_id(length: usize, db: &Db) -> Result<String> {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct User {
+    pub id: String,
     pub admin: bool,
     pub password_hash: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DbUser {
+    admin: bool,
+    password_hash: String,
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -161,8 +192,12 @@ pub fn user(id: &str, db: &Db) -> Result<Option<User>> {
             Some(b) => b,
             None => return Ok(None),
         };
-        let user = bincode::deserialize(&bytes)?;
-        Ok(Some(user))
+        let user: DbUser = bincode::deserialize(&bytes)?;
+        Ok(Some(User {
+            id: id.to_owned(),
+            admin: user.admin,
+            password_hash: user.password_hash,
+        }))
     })
 }
 
@@ -173,21 +208,43 @@ pub fn insert_user(
     admin: bool,
     db: &Db,
     config: &Config,
-) -> Result<bool> {
+) -> Result<Option<User>> {
     task::block_in_place(move || {
         let users = db.open_tree("users")?;
         if users.contains_key(id)? {
-            return Ok(false);
+            return Ok(None);
         }
 
         let password_hash = crate::auth::hash(password.as_bytes(), &config.password)?;
-        let user = User {
+        let user = DbUser {
             admin,
             password_hash,
         };
 
         let bytes = bincode::serialize(&user)?;
         users.insert(id, bytes)?;
-        Ok(true)
+        Ok(Some(User {
+            id: id.to_owned(),
+            admin: user.admin,
+            password_hash: user.password_hash,
+        }))
+    })
+}
+
+#[tracing::instrument(level = "debug", skip(db))]
+pub fn delete_user(id: &str, db: &Db) -> Result<Option<User>> {
+    task::block_in_place(move || {
+        let users = db.open_tree("users")?;
+        match users.remove(id)? {
+            Some(b) => {
+                let user: DbUser = bincode::deserialize(&b)?;
+                Ok(Some(User {
+                    id: id.to_owned(),
+                    admin: user.admin,
+                    password_hash: user.password_hash,
+                }))
+            }
+            None => Ok(None),
+        }
     })
 }
