@@ -57,7 +57,10 @@ fn main() -> Result<(), Error> {
     let db = db::connect(&config.database)?;
 
     let mut runtime = runtime::build(&config.runtime)?;
-    runtime.block_on(serve(routes::handler(config, db), config));
+    runtime.block_on(serve(
+        routes::handler(config, db).with(warp::trace::request()),
+        config,
+    ));
 
     Ok(())
 }

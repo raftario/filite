@@ -83,7 +83,7 @@ impl<T, E: Display> TryExt<T> for Result<T, E> {
 
     fn or_409(self) -> Result<T, Rejection> {
         self.map_err(|e| {
-            tracing::error!("{}", e);
+            tracing::info!("{}", e);
             warp::reject::custom(FiliteRejection::Conflict)
         })
     }

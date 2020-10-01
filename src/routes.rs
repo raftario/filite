@@ -63,6 +63,7 @@ pub fn handler(
         .or(put_text)
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn filite(id: String, db: &Db) -> Result<impl Reply, Rejection> {
     impl Reply for Filite {
         fn into_response(self) -> Response {
@@ -83,6 +84,7 @@ async fn filite(id: String, db: &Db) -> Result<impl Reply, Rejection> {
     Ok(filite)
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn post_file(
     user: User,
     data: Bytes,
@@ -94,6 +96,7 @@ async fn post_file(
     put_file(id, user, data, mime, db).await
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn put_file(
     id: String,
     user: User,
@@ -107,6 +110,7 @@ async fn put_file(
     Ok(id)
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn post_link(
     user: User,
     location: Uri,
@@ -117,6 +121,7 @@ async fn post_link(
     put_link(id, user, location, db).await
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn put_link(id: String, user: User, location: Uri, db: &Db) -> Result<impl Reply, Rejection> {
     crate::db::insert_link(&id, user.id, location.to_string(), db)
         .or_500()?
@@ -124,6 +129,7 @@ async fn put_link(id: String, user: User, location: Uri, db: &Db) -> Result<impl
     Ok(id)
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn post_text(
     user: User,
     data: String,
@@ -134,6 +140,7 @@ async fn post_text(
     put_text(id, user, data, db).await
 }
 
+#[tracing::instrument(level = "debug", skip(db))]
 async fn put_text(id: String, user: User, data: String, db: &Db) -> Result<impl Reply, Rejection> {
     crate::db::insert_text(&id, user.id, data, db)
         .or_500()?
