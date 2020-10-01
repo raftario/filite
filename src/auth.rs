@@ -9,7 +9,7 @@ use sled::Db;
 use tokio::task;
 use warp::{Filter, Rejection};
 
-pub fn auth_optional(
+pub fn optional(
     db: &'static Db,
     config: &'static Config,
 ) -> impl Filter<Extract = (Option<User>,), Error = Rejection> + Copy + Send + Sync + 'static {
@@ -24,7 +24,7 @@ pub fn auth_optional(
     })
 }
 
-pub fn auth_required(
+pub fn required(
     db: &'static Db,
     config: &'static Config,
 ) -> impl Filter<Extract = (User,), Error = Rejection> + Copy + Send + Sync + 'static {

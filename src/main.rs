@@ -6,6 +6,9 @@ mod routes;
 mod runtime;
 mod util;
 
+#[cfg(test)]
+mod tests;
+
 use anyhow::Error;
 use config::Config;
 use structopt::StructOpt;
