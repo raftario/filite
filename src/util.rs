@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use std::str::FromStr;
-use warp::{http::StatusCode, Filter, Rejection};
+use warp::{Filter, Rejection};
 
 pub trait DefaultExt {
     fn is_default(&self) -> bool;
@@ -18,11 +18,11 @@ where
 {
     warp::body::bytes().and_then(|b: Bytes| async move {
         match std::str::from_utf8(&b) {
-            Ok(s) => match s.parse() {
+            Ok(s) => match T::from_str(s) {
                 Ok(v) => Ok(v),
-                Err(e) => Err(crate::reject::custom(e, StatusCode::BAD_REQUEST)),
+                Err(e) => Err(crate::reject::bad_request(e)),
             },
-            Err(e) => Err(crate::reject::custom(e, StatusCode::BAD_REQUEST)),
+            Err(e) => Err(crate::reject::bad_request(e)),
         }
     })
 }

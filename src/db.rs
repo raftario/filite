@@ -5,7 +5,6 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::fmt;
-use tokio::task;
 
 #[tracing::instrument(level = "debug")]
 pub fn connect(config: &DatabaseConfig) -> Result<&'static Db> {
@@ -33,17 +32,7 @@ pub enum FiliteInner {
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
-pub fn filite(id: &str, inc: bool, db: &Db) -> Result<Option<Filite>> {
-    task::block_in_place(move || {
-        if inc {
-            filite_inc(id, db)
-        } else {
-            filite_noinc(id, db)
-        }
-    })
-}
-
-fn filite_inc(id: &str, db: &Db) -> Result<Option<Filite>> {
+pub fn get(id: &str, db: &Db) -> Result<Option<Filite>> {
     macro_rules! tryy {
         ($op:expr, $default:expr, $val:ident) => {
             match $op {
@@ -71,25 +60,14 @@ fn filite_inc(id: &str, db: &Db) -> Result<Option<Filite>> {
     filite
 }
 
-fn filite_noinc(id: &str, db: &Db) -> Result<Option<Filite>> {
-    let bytes = match db.get(id)? {
-        Some(b) => b,
-        None => return Ok(None),
-    };
-    let filite = bincode::deserialize(&bytes)?;
-    Ok(Some(filite))
-}
-
 fn insert_filite(id: &str, filite: Filite, db: &Db) -> Result<Option<Filite>> {
-    task::block_in_place(move || {
-        if db.contains_key(id)? {
-            return Ok(None);
-        }
+    if db.contains_key(id)? {
+        return Ok(None);
+    }
 
-        let bytes = bincode::serialize(&filite)?;
-        db.insert(id, bytes)?;
-        Ok(Some(filite))
-    })
+    let bytes = bincode::serialize(&filite)?;
+    db.insert(id, bytes)?;
+    Ok(Some(filite))
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
@@ -142,34 +120,33 @@ pub fn insert_text(id: &str, owner: String, data: String, db: &Db) -> Result<Opt
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn delete_filite(id: &str, user: &User, db: &Db) -> Result<Option<Filite>> {
-    task::block_in_place(move || match filite_noinc(id, db)? {
-        Some(f) => {
-            if user.admin || f.owner == user.id {
-                db.remove(id)?;
-                Ok(Some(f))
-            } else {
-                Ok(None)
-            }
-        }
-        None => Ok(None),
-    })
+    let bytes = match db.get(id)? {
+        Some(b) => b,
+        None => return Ok(None),
+    };
+    let filite: Filite = bincode::deserialize(&bytes)?;
+
+    if user.admin || filite.owner == user.id {
+        db.remove(id)?;
+        Ok(Some(filite))
+    } else {
+        Ok(None)
+    }
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn random_id(length: usize, db: &Db) -> Result<String> {
-    task::block_in_place(move || {
-        let mut id;
-        loop {
-            id = rand::thread_rng()
-                .sample_iter(Alphanumeric)
-                .take(length)
-                .collect();
+    let mut id;
+    loop {
+        id = rand::thread_rng()
+            .sample_iter(Alphanumeric)
+            .take(length)
+            .collect();
 
-            if !db.contains_key(&id)? {
-                break Ok(id);
-            }
+        if !db.contains_key(&id)? {
+            break Ok(id);
         }
-    })
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -196,19 +173,17 @@ struct DbUser {
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn user(id: &str, db: &Db) -> Result<Option<User>> {
-    task::block_in_place(move || {
-        let users = db.open_tree("users")?;
-        let bytes = match users.get(id)? {
-            Some(b) => b,
-            None => return Ok(None),
-        };
-        let user: DbUser = bincode::deserialize(&bytes)?;
-        Ok(Some(User {
-            id: id.to_owned(),
-            admin: user.admin,
-            password_hash: user.password_hash,
-        }))
-    })
+    let users = db.open_tree("users")?;
+    let bytes = match users.get(id)? {
+        Some(b) => b,
+        None => return Ok(None),
+    };
+    let user: DbUser = bincode::deserialize(&bytes)?;
+    Ok(Some(User {
+        id: id.to_owned(),
+        admin: user.admin,
+        password_hash: user.password_hash,
+    }))
 }
 
 #[tracing::instrument(level = "debug", skip(password, db))]
@@ -219,42 +194,38 @@ pub fn insert_user(
     db: &Db,
     config: &Config,
 ) -> Result<Option<User>> {
-    task::block_in_place(move || {
-        let users = db.open_tree("users")?;
-        if users.contains_key(id)? {
-            return Ok(None);
-        }
+    let users = db.open_tree("users")?;
+    if users.contains_key(id)? {
+        return Ok(None);
+    }
 
-        let password_hash = crate::auth::hash(password.as_bytes(), &config.password)?;
-        let user = DbUser {
-            admin,
-            password_hash,
-        };
+    let password_hash = crate::auth::hash(password.as_bytes(), &config.password)?;
+    let user = DbUser {
+        admin,
+        password_hash,
+    };
 
-        let bytes = bincode::serialize(&user)?;
-        users.insert(id, bytes)?;
-        Ok(Some(User {
-            id: id.to_owned(),
-            admin: user.admin,
-            password_hash: user.password_hash,
-        }))
-    })
+    let bytes = bincode::serialize(&user)?;
+    users.insert(id, bytes)?;
+    Ok(Some(User {
+        id: id.to_owned(),
+        admin: user.admin,
+        password_hash: user.password_hash,
+    }))
 }
 
 #[tracing::instrument(level = "debug", skip(db))]
 pub fn delete_user(id: &str, db: &Db) -> Result<Option<User>> {
-    task::block_in_place(move || {
-        let users = db.open_tree("users")?;
-        match users.remove(id)? {
-            Some(b) => {
-                let user: DbUser = bincode::deserialize(&b)?;
-                Ok(Some(User {
-                    id: id.to_owned(),
-                    admin: user.admin,
-                    password_hash: user.password_hash,
-                }))
-            }
-            None => Ok(None),
+    let users = db.open_tree("users")?;
+    match users.remove(id)? {
+        Some(b) => {
+            let user: DbUser = bincode::deserialize(&b)?;
+            Ok(Some(User {
+                id: id.to_owned(),
+                admin: user.admin,
+                password_hash: user.password_hash,
+            }))
         }
-    })
+        None => Ok(None),
+    }
 }

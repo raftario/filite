@@ -7,27 +7,21 @@ use warp::{
 
 #[derive(Debug, Clone)]
 enum FiliteRejection {
-    BadRequest,
-    Unauthorized,
+    BadRequest(String),
+    Unauthorized(String),
     NotFound,
     Conflict,
     InternalServerError,
-
-    Custom(String, StatusCode),
 }
 impl Reject for FiliteRejection {}
 impl Reply for FiliteRejection {
     fn into_response(self) -> Response {
         match self {
-            Self::BadRequest => {
-                warp::reply::with_status("Bad Request", StatusCode::BAD_REQUEST).into_response()
+            Self::BadRequest(reply) => {
+                warp::reply::with_status(reply, StatusCode::BAD_REQUEST).into_response()
             }
-            Self::Unauthorized => warp::reply::with_status(
-                warp::reply::with_header(
-                    "Unauthorized",
-                    "WWW-Authenticate",
-                    r#"Basic realm="filite""#,
-                ),
+            Self::Unauthorized(reply) => warp::reply::with_status(
+                warp::reply::with_header(reply, "WWW-Authenticate", r#"Basic realm="filite""#),
                 StatusCode::UNAUTHORIZED,
             )
             .into_response(),
@@ -41,44 +35,28 @@ impl Reply for FiliteRejection {
                 warp::reply::with_status("Internal Server Error", StatusCode::INTERNAL_SERVER_ERROR)
                     .into_response()
             }
-
-            Self::Custom(reply, status) => warp::reply::with_status(reply, status).into_response(),
         }
     }
 }
 
-#[inline]
-pub fn unauthorized() -> Rejection {
-    warp::reject::custom(FiliteRejection::Unauthorized)
+pub fn bad_request(reply: impl ToString) -> Rejection {
+    warp::reject::custom(FiliteRejection::BadRequest(reply.to_string()))
 }
-
-#[inline]
-pub fn custom<T: ToString>(reply: T, status: StatusCode) -> Rejection {
-    warp::reject::custom(FiliteRejection::Custom(reply.to_string(), status))
+pub fn unauthorized(reply: impl ToString) -> Rejection {
+    warp::reject::custom(FiliteRejection::Unauthorized(reply.to_string()))
 }
 
 pub trait TryExt<T> {
-    fn or_400(self) -> Result<T, Rejection>;
-    fn or_401(self) -> Result<T, Rejection>;
     fn or_404(self) -> Result<T, Rejection>;
     fn or_409(self) -> Result<T, Rejection>;
 
     fn or_500(self) -> Result<T, Rejection>;
+
+    fn or_bad_request(self, reply: impl ToString) -> Result<T, Rejection>;
+    fn or_unauthorized(self, reply: impl ToString) -> Result<T, Rejection>;
 }
 
 impl<T, E: Display> TryExt<T> for Result<T, E> {
-    fn or_400(self) -> Result<T, Rejection> {
-        self.map_err(|e| {
-            tracing::info!("{}", e);
-            warp::reject::custom(FiliteRejection::BadRequest)
-        })
-    }
-    fn or_401(self) -> Result<T, Rejection> {
-        self.map_err(|e| {
-            tracing::info!("{}", e);
-            warp::reject::custom(FiliteRejection::Unauthorized)
-        })
-    }
     fn or_404(self) -> Result<T, Rejection> {
         self.map_err(|e| {
             tracing::info!("{}", e);
@@ -98,15 +76,22 @@ impl<T, E: Display> TryExt<T> for Result<T, E> {
             warp::reject::custom(FiliteRejection::InternalServerError)
         })
     }
+
+    fn or_bad_request(self, reply: impl ToString) -> Result<T, Rejection> {
+        self.map_err(|e| {
+            tracing::info!("{}", e);
+            bad_request(reply)
+        })
+    }
+    fn or_unauthorized(self, reply: impl ToString) -> Result<T, Rejection> {
+        self.map_err(|e| {
+            tracing::info!("{}", e);
+            unauthorized(reply)
+        })
+    }
 }
 
 impl<T> TryExt<T> for Option<T> {
-    fn or_400(self) -> Result<T, Rejection> {
-        self.ok_or_else(|| warp::reject::custom(FiliteRejection::BadRequest))
-    }
-    fn or_401(self) -> Result<T, Rejection> {
-        self.ok_or_else(|| warp::reject::custom(FiliteRejection::Unauthorized))
-    }
     fn or_404(self) -> Result<T, Rejection> {
         self.ok_or_else(|| warp::reject::custom(FiliteRejection::NotFound))
     }
@@ -116,6 +101,13 @@ impl<T> TryExt<T> for Option<T> {
 
     fn or_500(self) -> Result<T, Rejection> {
         self.ok_or_else(|| warp::reject::custom(FiliteRejection::InternalServerError))
+    }
+
+    fn or_bad_request(self, reply: impl ToString) -> Result<T, Rejection> {
+        self.ok_or_else(move || bad_request(reply))
+    }
+    fn or_unauthorized(self, reply: impl ToString) -> Result<T, Rejection> {
+        self.ok_or_else(move || unauthorized(reply))
     }
 }
 
