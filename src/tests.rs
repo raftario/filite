@@ -1,11 +1,11 @@
 use crate::config::Config;
 use sled::Db;
-use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 use warp::http::StatusCode;
 
 fn setup() -> (&'static Config, &'static Db) {
     tracing_subscriber::fmt()
-        .with_env_filter("debug")
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()))
         .with_span_events(FmtSpan::CLOSE)
         .try_init()
         .ok();

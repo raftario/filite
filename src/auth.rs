@@ -32,7 +32,7 @@ async fn user(header: HeaderValue, db: &Db, config: &Config) -> Result<User, Rej
         .or_500()?
         .or_unauthorized("Invalid Credentials")?;
 
-    let valid = !task::block_in_place(|| {
+    let valid = task::block_in_place(|| {
         verify(
             &user.password_hash,
             credentials.password().as_bytes(),
