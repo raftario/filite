@@ -212,6 +212,8 @@ It's possible to get an array of all existing entries for each type with an auth
 - `GET /l`
 - `GET /t`
 
+You can view the created entries in a more organized manner with the third-party [filite-list](https://github.com/Syndamia/filite-list) script.
+
 ### Creating new entries
 
 There are two ways to create new entries, `PUT` or `POST` requests.
