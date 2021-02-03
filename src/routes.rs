@@ -18,6 +18,9 @@ use std::{fs, path::PathBuf};
 
 /// Parses an ID
 fn parse_id(id: &str) -> Result<i32, HttpResponse> {
+    // Remove any file extension from id
+    let id = id.split('.').next().unwrap_or_default();
+
     match i32::from_str_radix(id, 36) {
         Ok(id) => Ok(id),
         Err(_) => Err(HttpResponse::BadRequest().body("Invalid ID")),
