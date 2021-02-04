@@ -107,7 +107,7 @@ pub mod files {
                 return match e {
                     Error::NotFound => Ok(()),
                     _ => Err(e),
-                }
+                };
             }
         });
         if !path.exists() {
