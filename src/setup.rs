@@ -104,7 +104,7 @@ impl Default for Config {
                 .expect("Can't convert database path to string")
                 .to_owned()
         };
-        let pool_size = std::cmp::max(1, num_cpus::get() as u32 / 2);
+        let pool_size = std::cmp::max(2, num_cpus::get() as u32 / 2);
         let files_dir = get_data_dir().join("files");
 
         Self {
