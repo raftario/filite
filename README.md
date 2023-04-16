@@ -1,5 +1,7 @@
 # filite
 
+**THIS PROJECT IS CURRENTLY UNMAINTAINED AS I NO LONGER USE IT MYSELF AND DO NOT HAVE THE TIME NOR ENERGY TO COMMIT TO MAINTAINING IT. SORRY.**
+
 > The `master` branch isn't actively maintained anymore, and the current development branch, `next`, will be merged into it in the near future.
 
 A simple, light and standalone pastebin, URL shortener and file-sharing service that hosts **fi**les, redirects **li**nks and stores **te**xts.
