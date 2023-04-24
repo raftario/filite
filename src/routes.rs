@@ -46,7 +46,7 @@ async fn auth(identity: Identity, request: HttpRequest) -> Result<(), HttpRespon
         None => {
             return Err(HttpResponse::Unauthorized()
                 .header("WWW-Authenticate", "Basic realm=\"filite\"")
-                .body("Unauthorized"))
+                .body("Unauthorized"));
         }
     };
     let connection_string = header.replace("Basic ", "");
@@ -182,13 +182,13 @@ macro_rules! random_id {
                             _ => {
                                 return Err(actix_web::HttpResponse::InternalServerError()
                                     .body("Internal server error")
-                                    .into())
+                                    .into());
                             }
                         },
                         actix_web::error::BlockingError::Canceled => {
                             return Err(actix_web::HttpResponse::InternalServerError()
                                 .body("Internal server error")
-                                .into())
+                                .into());
                         }
                     },
                 }
@@ -199,17 +199,24 @@ macro_rules! random_id {
 
 #[cfg(feature = "dev")]
 lazy_static! {
-    static ref INDEX_PATH: PathBuf = {
-        let mut index_path = PathBuf::new();
-        index_path.push(get_env!("CARGO_MANIFEST_DIR"));
-        index_path.push("resources");
-        index_path.push("index.html");
-        index_path
-    };
+    fn static_resource_path(filename: &str) -> PathBuf {
+        let mut path = PathBuf::new();
+        path.push(get_env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        path.push(filename);
+        path
+    }
+    static ref INDEX_PATH: PathBuf = static_resource_path("index.html");
+    static ref JS_PATH: PathBuf = static_resource_path("index.html");
+    static ref ICON_PATH: PathBuf = static_resource_path("index.html");
+    static ref CSS_PATH: PathBuf = static_resource_path("index.html");
 }
 
 #[cfg(not(feature = "dev"))]
 static INDEX_CONTENTS: &str = include_str!("../resources/index.html");
+static JS_CONTENTS: &str = include_str!("../resources/highlight.min.js");
+static ICON_CONTENTS: &str = include_str!("../resources/spectre-icons.min.css");
+static CSS_CONTENTS: &str = include_str!("../resources/spectre.min.css");
 
 static HIGHLIGHT_CONTENTS: &str = include_str!("../resources/highlight.html");
 const HIGHLIGHT_LANGUAGE: &str = r#"<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/languages/{{ language }}.min.js"></script>"#;
@@ -232,6 +239,69 @@ pub async fn index(request: HttpRequest, identity: Identity) -> impl Responder {
     };
     HttpResponse::Ok()
         .header("Content-Type", "text/html")
+        .body(contents.replace("{{ themepath }}", &CONFIG.highlight.themepath))
+}
+
+/// CSS file to style the page from a local source
+pub async fn css(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*CSS_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            CSS_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/css")
+        .body(contents)
+}
+
+/// Icon-specific CSS file to style the page from a local source
+pub async fn icon(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*ICON_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            ICON_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/css")
+        .body(contents)
+}
+
+/// JS file to highlight code from a local source
+pub async fn js(request: HttpRequest, identity: Identity) -> impl Responder {
+    if let Err(response) = auth(identity, request).await {
+        return response;
+    }
+
+    let contents = {
+        #[cfg(feature = "dev")]
+        {
+            fs::read_to_string(&*JS_PATH).expect("Can't read spectre.min.css")
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            JS_CONTENTS.to_owned()
+        }
+    };
+    HttpResponse::Ok()
+        .header("Content-Type", "text/javascript")
         .body(contents)
 }
 
@@ -321,7 +391,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::BadRequest()
                     .body("Empty multipart body")
-                    .into())
+                    .into());
             }
         };
         let content_disposition = match field.content_disposition() {
@@ -329,7 +399,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::BadRequest()
                     .body("Missing content disposition")
-                    .into())
+                    .into());
             }
         };
         let filename = match content_disposition.get_filename() {
@@ -348,7 +418,7 @@ pub mod files {
             None => {
                 return Err(HttpResponse::InternalServerError()
                     .body("Internal server error")
-                    .into())
+                    .into());
             }
         };
 
@@ -357,7 +427,7 @@ pub mod files {
             Err(_) => {
                 return Err(HttpResponse::InternalServerError()
                     .body("Internal server error")
-                    .into())
+                    .into());
             }
         };
         while let Some(chunk) = field.next().await {
@@ -366,7 +436,7 @@ pub mod files {
                 Err(_) => {
                     return Err(HttpResponse::BadRequest()
                         .body("Invalid multipart data")
-                        .into())
+                        .into());
                 }
             };
 
@@ -380,7 +450,7 @@ pub mod files {
                 Err(_) => {
                     return Err(HttpResponse::InternalServerError()
                         .body("Internal server error")
-                        .into())
+                        .into());
                 }
             };
         }
@@ -513,6 +583,7 @@ pub mod texts {
                     let contents = HIGHLIGHT_CONTENTS
                         .replace("{{ title }}", &path)
                         .replace("{{ theme }}", &CONFIG.highlight.theme)
+                        .replace("{{ themepath }}", &CONFIG.highlight.themepath)
                         .replace("{{ contents }}", &escape_html(&text.contents))
                         .replace("{{ languages }}", &languages);
 
@@ -523,7 +594,10 @@ pub mod texts {
                 } else {
                     Ok(HttpResponse::Ok()
                         .header("Last-Modified", last_modified)
-                        .body(text.contents))
+                        .body(
+                            text.contents
+                                .replace("{{ themepath }}", &CONFIG.highlight.themepath),
+                        ))
                 }
             }
             Err(e) => match_find_error(e),
