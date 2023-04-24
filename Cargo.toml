@@ -36,7 +36,7 @@ radix_fmt = "1.0.0"
 rand = "0.7.3"
 toml = "0.5.5"
 [dependencies.diesel]
-version = "1.4.3"
+version = "1.4.6"
 features = ["r2d2", "sqlite"]
 [dependencies.libsqlite3-sys]
 version = "0.16.0"
